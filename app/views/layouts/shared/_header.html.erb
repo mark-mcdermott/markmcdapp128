@@ -14,7 +14,6 @@
               <% # if logged_in? %>
                 <li class="nav-item"><%= link_to 'Users', '/users', class: 'nav-link' %></li>
               <% # end %>
-              <li class="nav-item"><%= link_to 'Contact', '/contact', class: 'nav-link' %></li>
 
               <% # if !logged_in? %>
                 <li class="nav-item"><%= link_to 'Log in', '/login', class: 'nav-link' %></li>
