@@ -17,6 +17,9 @@ jobs:
       - ruby/install-deps
       - node/install-packages:
           pkg-manager: yarn
+      - run:
+          name: Install NPM Globals
+          command: sudo yarn global add sass gulp-cli
       - run: gulp
       - run: bundle install
 
