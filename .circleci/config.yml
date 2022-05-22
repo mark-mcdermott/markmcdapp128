@@ -15,31 +15,12 @@ jobs:
     steps:
       - checkout
       - ruby/install-deps
-      - node/install-packages
-  checking:
-    docker:
-      - image: 'cimg/ruby:3.0.0-node'
-    steps:
-      - checkout
-      - ruby/install-deps
-      - ruby/rubocop-check:
-          format: progress
-          label: Inspecting with Rubocop
-  test:
-    docker:
-      - image: 'cimg/ruby:3.0.0-node'
-    steps:
-      - checkout
-      - ruby/install-deps
-      - node/install-packages
-      - ruby/rspec-test:
-          include: spec/**/*_spec.rb
+      - node/install-packages:
+          pkg-manager: yarn
+      - run: gulp
+      - run: bundle install
 
 workflows:
-  build_and_test:
+  main_workflow:
     jobs:
       - build
-      - checking
-      - test:
-          requires:
-            - build
