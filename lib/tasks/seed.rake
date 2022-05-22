@@ -1,7 +1,7 @@
 namespace :seed do
 
   desc "reset dev db"
-  task :reset_dev_db do 
+  task :reset_dev_db do
     Rake::Task['db:reset'].invoke
   end
 
@@ -49,12 +49,14 @@ namespace :seed do
   task :dev do
     Rake::Task['seed:reset_dev_db'].invoke
     Rake::Task['seed:users'].invoke
+    Rake::Task['seed:scores'].invoke
   end
 
   desc "seed prod"
   task :prod do
     Rake::Task['seed:reset_prod_db'].invoke
     Rake::Task['seed:users'].invoke
+    Rake::Task['seed:scores'].invoke
   end
 
 end
