@@ -4,6 +4,11 @@ class ScoresController < ApplicationController
   # GET /scores or /scores.json
   def index
     @scores = Score.all.order(value: :desc).first(10)
+    puts 'SCORES: '
+    puts Score.all.length
+    @scores.each do |score|
+      puts score.value 
+    end
   end
 
   # GET /scores/1 or /scores/1.json
