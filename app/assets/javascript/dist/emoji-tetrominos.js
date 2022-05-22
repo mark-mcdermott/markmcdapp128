@@ -1,2168 +1,1181 @@
-(function e(t, n, r) {
-  function s(o, u) {
-    if (!n[o]) {
-      if (!t[o]) {
-        var a = typeof require == "function" && require;if (!u && a) return a(o, !0);if (i) return i(o, !0);throw new Error("Cannot find module '" + o + "'");
-      }var f = n[o] = { exports: {} };t[o][0].call(f.exports, function (e) {
-        var n = t[o][1][e];return s(n ? n : e);
-      }, f, f.exports, e, t, n, r);
-    }return n[o].exports;
-  }var i = typeof require == "function" && require;for (var o = 0; o < r.length; o++) s(r[o]);return s;
-})({ 1: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// -------------------------------------------------------------
+// --------------------- Block Class ---------------------------
+// -------------------------------------------------------------
+// Blocks have letter name: I, T, J, L & O (http://i.imgur.com/9Z0oJXe.png)
+// All block movement/collision calculated from block coordiates
+// Blocks are made of 4 "pixels"
+// First block "pixel" is top left pixel
+// Subsequent block coordinates are calculated from first pixel
+// Rotations based on NES controls (http://imgur.com/a/IVRrf)
+// For collision detection, make first coordinate pair in coords
+// array the block's far left pixel.  Make the last coorinate
+// coordinate pair the far right pixel.
+module.exports = class Block {
+  // block constructor (needs block letter & initial coords)
+  constructor(letter, x, y) {
+    this.letter = letter.toUpperCase();
+    this[`_init${this.letter}`](x, y);
+  } // init L block (needs its initial coords)
 
-      ;(function (exports) {
-        'use strict';
 
-        var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array;
+  _initL(x, y) {
+    this.height = 2; // L block height (for floor/block collision)
 
-        var PLUS = '+'.charCodeAt(0);
-        var SLASH = '/'.charCodeAt(0);
-        var NUMBER = '0'.charCodeAt(0);
-        var LOWER = 'a'.charCodeAt(0);
-        var UPPER = 'A'.charCodeAt(0);
-        var PLUS_URL_SAFE = '-'.charCodeAt(0);
-        var SLASH_URL_SAFE = '_'.charCodeAt(0);
+    this.width = 3; // L block width (for wall collision)
 
-        function decode(elt) {
-          var code = elt.charCodeAt(0);
-          if (code === PLUS || code === PLUS_URL_SAFE) return 62; // '+'
-          if (code === SLASH || code === SLASH_URL_SAFE) return 63; // '/'
-          if (code < NUMBER) return -1; //no match
-          if (code < NUMBER + 10) return code - NUMBER + 26 + 26;
-          if (code < UPPER + 26) return code - UPPER;
-          if (code < LOWER + 26) return code - LOWER + 26;
-        }
+    this.numPix = 4; // num pixels in L block
 
-        function b64ToByteArray(b64) {
-          var i, j, l, tmp, placeHolders, arr;
+    this.curRotation = 0; // current pos in rotations array
 
-          if (b64.length % 4 > 0) {
-            throw new Error('Invalid string. Length must be a multiple of 4');
-          }
+    this.emoji = "😀";
+    this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 2, y]];
 
-          // the number of equal signs (place holders)
-          // if there are two placeholders, than the two characters before it
-          // represent one byte
-          // if there is only one, then the three characters before it represent 2 bytes
-          // this is just a cheap hack to not do indexOf twice
-          var len = b64.length;
-          placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0;
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if L is vert, checks for collisions
 
-          // base64 is 4/3 + up to two characters of the original data
-          arr = new Arr(b64.length * 3 / 4 - placeHolders);
-
-          // if there are placeholders, only get up to the last complete 4 chars
-          l = placeHolders > 0 ? b64.length - 4 : b64.length;
-
-          var L = 0;
-
-          function push(v) {
-            arr[L++] = v;
-          }
-
-          for (i = 0, j = 0; i < l; i += 4, j += 3) {
-            tmp = decode(b64.charAt(i)) << 18 | decode(b64.charAt(i + 1)) << 12 | decode(b64.charAt(i + 2)) << 6 | decode(b64.charAt(i + 3));
-            push((tmp & 0xFF0000) >> 16);
-            push((tmp & 0xFF00) >> 8);
-            push(tmp & 0xFF);
-          }
-
-          if (placeHolders === 2) {
-            tmp = decode(b64.charAt(i)) << 2 | decode(b64.charAt(i + 1)) >> 4;
-            push(tmp & 0xFF);
-          } else if (placeHolders === 1) {
-            tmp = decode(b64.charAt(i)) << 10 | decode(b64.charAt(i + 1)) << 4 | decode(b64.charAt(i + 2)) >> 2;
-            push(tmp >> 8 & 0xFF);
-            push(tmp & 0xFF);
-          }
-
-          return arr;
-        }
-
-        function uint8ToBase64(uint8) {
-          var i,
-              extraBytes = uint8.length % 3,
-              // if we have 1 byte left, pad 2 bytes
-          output = "",
-              temp,
-              length;
-
-          function encode(num) {
-            return lookup.charAt(num);
-          }
-
-          function tripletToBase64(num) {
-            return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F);
-          }
-
-          // go through the array every three bytes, we'll deal with trailing stuff later
-          for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
-            temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + uint8[i + 2];
-            output += tripletToBase64(temp);
-          }
-
-          // pad the end with zeros, but make sure to not forget the extra bytes
-          switch (extraBytes) {
-            case 1:
-              temp = uint8[uint8.length - 1];
-              output += encode(temp >> 2);
-              output += encode(temp << 4 & 0x3F);
-              output += '==';
-              break;
-            case 2:
-              temp = (uint8[uint8.length - 2] << 8) + uint8[uint8.length - 1];
-              output += encode(temp >> 10);
-              output += encode(temp >> 4 & 0x3F);
-              output += encode(temp << 2 & 0x3F);
-              output += '=';
-              break;
-          }
-
-          return output;
-        }
-
-        exports.toByteArray = b64ToByteArray;
-        exports.fromByteArray = uint8ToBase64;
-      })(typeof exports === 'undefined' ? this.base64js = {} : exports);
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/../node_modules/base64-js/lib/b64.js", "/../node_modules/base64-js/lib");
-  }, { "buffer": 2, "pBGvAp": 4 }], 2: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      /*!
-       * The buffer module from node.js, for the browser.
-       *
-       * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
-       * @license  MIT
-       */
-
-      var base64 = require('base64-js');
-      var ieee754 = require('ieee754');
-
-      exports.Buffer = Buffer;
-      exports.SlowBuffer = Buffer;
-      exports.INSPECT_MAX_BYTES = 50;
-      Buffer.poolSize = 8192;
-
-      /**
-       * If `Buffer._useTypedArrays`:
-       *   === true    Use Uint8Array implementation (fastest)
-       *   === false   Use Object implementation (compatible down to IE6)
-       */
-      Buffer._useTypedArrays = function () {
-        // Detect if browser supports Typed Arrays. Supported browsers are IE 10+, Firefox 4+,
-        // Chrome 7+, Safari 5.1+, Opera 11.6+, iOS 4.2+. If the browser does not support adding
-        // properties to `Uint8Array` instances, then that's the same as no `Uint8Array` support
-        // because we need to be able to add all the node Buffer API methods. This is an issue
-        // in Firefox 4-29. Now fixed: https://bugzilla.mozilla.org/show_bug.cgi?id=695438
-        try {
-          var buf = new ArrayBuffer(0);
-          var arr = new Uint8Array(buf);
-          arr.foo = function () {
-            return 42;
-          };
-          return 42 === arr.foo() && typeof arr.subarray === 'function'; // Chrome 9-10 lack `subarray`
-        } catch (e) {
-          return false;
-        }
-      }();
-
-      /**
-       * Class: Buffer
-       * =============
-       *
-       * The Buffer constructor returns instances of `Uint8Array` that are augmented
-       * with function properties for all the node `Buffer` API functions. We use
-       * `Uint8Array` so that square bracket notation works as expected -- it returns
-       * a single octet.
-       *
-       * By augmenting the instances, we can avoid modifying the `Uint8Array`
-       * prototype.
-       */
-      function Buffer(subject, encoding, noZero) {
-        if (!(this instanceof Buffer)) return new Buffer(subject, encoding, noZero);
-
-        var type = typeof subject;
-
-        // Workaround: node's base64 implementation allows for non-padded strings
-        // while base64-js does not.
-        if (encoding === 'base64' && type === 'string') {
-          subject = stringtrim(subject);
-          while (subject.length % 4 !== 0) {
-            subject = subject + '=';
-          }
-        }
-
-        // Find the length
-        var length;
-        if (type === 'number') length = coerce(subject);else if (type === 'string') length = Buffer.byteLength(subject, encoding);else if (type === 'object') length = coerce(subject.length); // assume that object is array-like
-        else throw new Error('First argument needs to be a number, array or string.');
-
-        var buf;
-        if (Buffer._useTypedArrays) {
-          // Preferred: Return an augmented `Uint8Array` instance for best performance
-          buf = Buffer._augment(new Uint8Array(length));
-        } else {
-          // Fallback: Return THIS instance of Buffer (created by `new`)
-          buf = this;
-          buf.length = length;
-          buf._isBuffer = true;
-        }
-
-        var i;
-        if (Buffer._useTypedArrays && typeof subject.byteLength === 'number') {
-          // Speed optimization -- use set if we're copying from a typed array
-          buf._set(subject);
-        } else if (isArrayish(subject)) {
-          // Treat array-ish objects as a byte array
-          for (i = 0; i < length; i++) {
-            if (Buffer.isBuffer(subject)) buf[i] = subject.readUInt8(i);else buf[i] = subject[i];
-          }
-        } else if (type === 'string') {
-          buf.write(subject, 0, encoding);
-        } else if (type === 'number' && !Buffer._useTypedArrays && !noZero) {
-          for (i = 0; i < length; i++) {
-            buf[i] = 0;
-          }
-        }
-
-        return buf;
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
+        return;
       }
 
-      // STATIC METHODS
-      // ==============
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
 
-      Buffer.isEncoding = function (encoding) {
-        switch (String(encoding).toLowerCase()) {
-          case 'hex':
-          case 'utf8':
-          case 'utf-8':
-          case 'ascii':
-          case 'binary':
-          case 'base64':
-          case 'raw':
-          case 'ucs2':
-          case 'ucs-2':
-          case 'utf16le':
-          case 'utf-16le':
-            return true;
-          default:
-            return false;
-        }
-      };
-
-      Buffer.isBuffer = function (b) {
-        return !!(b !== null && b !== undefined && b._isBuffer);
-      };
-
-      Buffer.byteLength = function (str, encoding) {
-        var ret;
-        str = str + '';
-        switch (encoding || 'utf8') {
-          case 'hex':
-            ret = str.length / 2;
+        switch (this.curRotation) {
+          /* down facing L block */
+          case 0:
+            this.coords = [[x - 1, y + 1], [x, y + 1], [x + 1, y + 1], [x - 1, y + 2]];
             break;
-          case 'utf8':
-          case 'utf-8':
-            ret = utf8ToBytes(str).length;
+
+          /* left facing L block */
+
+          case 1:
+            this.coords = [[x, y - 1], [x + 1, y - 1], [x + 1, y], [x + 1, y + 1]];
             break;
-          case 'ascii':
-          case 'binary':
-          case 'raw':
-            ret = str.length;
+
+          /* up facing L block */
+
+          case 2:
+            this.coords = [[x, y + 1], [x + 1, y + 1], [x + 2, y + 1], [x + 2, y]];
             break;
-          case 'base64':
-            ret = base64ToBytes(str).length;
+
+          /* right facing L block */
+
+          case 3:
+            this.coords = [[x + 1, y - 1], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
             break;
-          case 'ucs2':
-          case 'ucs-2':
-          case 'utf16le':
-          case 'utf-16le':
-            ret = str.length * 2;
+        }
+      }
+    };
+  } // init J block (needs its initial coords)
+
+
+  _initJ(x, y) {
+    this.height = 2; // J block height (for floor/block collision)
+
+    this.width = 3; // J block width (for wall collision)
+
+    this.numPix = 4; // num pixels in J block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "💩";
+    this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 2, y + 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if J is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing J block */
+          case 0:
+            this.coords = [[x - 1, y - 1], [x, y - 1], [x + 1, y - 1], [x + 1, y]];
             break;
-          default:
-            throw new Error('Unknown encoding');
-        }
-        return ret;
-      };
 
-      Buffer.concat = function (list, totalLength) {
-        assert(isArray(list), 'Usage: Buffer.concat(list, [totalLength])\n' + 'list should be an Array.');
+          /* left facing J block */
 
-        if (list.length === 0) {
-          return new Buffer(0);
-        } else if (list.length === 1) {
-          return list[0];
-        }
-
-        var i;
-        if (typeof totalLength !== 'number') {
-          totalLength = 0;
-          for (i = 0; i < list.length; i++) {
-            totalLength += list[i].length;
-          }
-        }
-
-        var buf = new Buffer(totalLength);
-        var pos = 0;
-        for (i = 0; i < list.length; i++) {
-          var item = list[i];
-          item.copy(buf, pos);
-          pos += item.length;
-        }
-        return buf;
-      };
-
-      // BUFFER INSTANCE METHODS
-      // =======================
-
-      function _hexWrite(buf, string, offset, length) {
-        offset = Number(offset) || 0;
-        var remaining = buf.length - offset;
-        if (!length) {
-          length = remaining;
-        } else {
-          length = Number(length);
-          if (length > remaining) {
-            length = remaining;
-          }
-        }
-
-        // must be an even number of digits
-        var strLen = string.length;
-        assert(strLen % 2 === 0, 'Invalid hex string');
-
-        if (length > strLen / 2) {
-          length = strLen / 2;
-        }
-        for (var i = 0; i < length; i++) {
-          var byte = parseInt(string.substr(i * 2, 2), 16);
-          assert(!isNaN(byte), 'Invalid hex string');
-          buf[offset + i] = byte;
-        }
-        Buffer._charsWritten = i * 2;
-        return i;
-      }
-
-      function _utf8Write(buf, string, offset, length) {
-        var charsWritten = Buffer._charsWritten = blitBuffer(utf8ToBytes(string), buf, offset, length);
-        return charsWritten;
-      }
-
-      function _asciiWrite(buf, string, offset, length) {
-        var charsWritten = Buffer._charsWritten = blitBuffer(asciiToBytes(string), buf, offset, length);
-        return charsWritten;
-      }
-
-      function _binaryWrite(buf, string, offset, length) {
-        return _asciiWrite(buf, string, offset, length);
-      }
-
-      function _base64Write(buf, string, offset, length) {
-        var charsWritten = Buffer._charsWritten = blitBuffer(base64ToBytes(string), buf, offset, length);
-        return charsWritten;
-      }
-
-      function _utf16leWrite(buf, string, offset, length) {
-        var charsWritten = Buffer._charsWritten = blitBuffer(utf16leToBytes(string), buf, offset, length);
-        return charsWritten;
-      }
-
-      Buffer.prototype.write = function (string, offset, length, encoding) {
-        // Support both (string, offset, length, encoding)
-        // and the legacy (string, encoding, offset, length)
-        if (isFinite(offset)) {
-          if (!isFinite(length)) {
-            encoding = length;
-            length = undefined;
-          }
-        } else {
-          // legacy
-          var swap = encoding;
-          encoding = offset;
-          offset = length;
-          length = swap;
-        }
-
-        offset = Number(offset) || 0;
-        var remaining = this.length - offset;
-        if (!length) {
-          length = remaining;
-        } else {
-          length = Number(length);
-          if (length > remaining) {
-            length = remaining;
-          }
-        }
-        encoding = String(encoding || 'utf8').toLowerCase();
-
-        var ret;
-        switch (encoding) {
-          case 'hex':
-            ret = _hexWrite(this, string, offset, length);
+          case 1:
+            this.coords = [[x, y + 1], [x + 1, y + 1], [x + 1, y], [x + 1, y - 1]];
             break;
-          case 'utf8':
-          case 'utf-8':
-            ret = _utf8Write(this, string, offset, length);
+
+          /* up facing J block */
+
+          case 2:
+            this.coords = [[x, y - 2], [x, y - 1], [x + 1, y - 1], [x + 2, y - 1]];
             break;
-          case 'ascii':
-            ret = _asciiWrite(this, string, offset, length);
+
+          /* right facing J block */
+
+          case 3:
+            this.coords = [[x + 1, y + 2], [x + 1, y + 1], [x + 1, y], [x + 2, y]];
             break;
-          case 'binary':
-            ret = _binaryWrite(this, string, offset, length);
+        }
+      }
+    };
+  } // init Z block (needs its initial coords)
+
+
+  _initZ(x, y) {
+    this.height = 2; // Z block height (for floor/block collision)
+
+    this.width = 3; // Z block width (for wall collision)
+
+    this.numPix = 4; // num pixels in Z block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🐶";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if Z is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing Z block */
+          case 0:
+            this.coords = [[x, y], [x - 1, y], [x, y + 1], [x + 1, y + 1]];
             break;
-          case 'base64':
-            ret = _base64Write(this, string, offset, length);
+
+          /* vert Z block */
+
+          case 1:
+            this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 1, y - 1]];
             break;
-          case 'ucs2':
-          case 'ucs-2':
-          case 'utf16le':
-          case 'utf-16le':
-            ret = _utf16leWrite(this, string, offset, length);
+        }
+      }
+    };
+  } // init S block (needs its initial coords)
+
+
+  _initS(x, y) {
+    this.height = 2; // S block height (for floor/block collision)
+
+    this.width = 3; // S block width (for wall collision)
+
+    this.numPix = 4; // num pixels in S block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🐮";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y - 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if S is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing S block */
+          case 0:
+            this.coords = [[x - 1, y + 1], [x, y + 1], [x, y], [x + 1, y]];
             break;
-          default:
-            throw new Error('Unknown encoding');
-        }
-        return ret;
-      };
 
-      Buffer.prototype.toString = function (encoding, start, end) {
-        var self = this;
+          /* vert S block */
 
-        encoding = String(encoding || 'utf8').toLowerCase();
-        start = Number(start) || 0;
-        end = end !== undefined ? Number(end) : end = self.length;
-
-        // Fastpath empty strings
-        if (end === start) return '';
-
-        var ret;
-        switch (encoding) {
-          case 'hex':
-            ret = _hexSlice(self, start, end);
+          case 1:
+            this.coords = [[x + 1, y - 1], [x + 1, y - 2], [x + 2, y - 1], [x + 2, y]];
             break;
-          case 'utf8':
-          case 'utf-8':
-            ret = _utf8Slice(self, start, end);
+        }
+      }
+    };
+  } // init T block (needs its initial coords)
+
+
+  _initT(x, y) {
+    this.height = 2; // T block height (for floor/block collision)
+
+    this.width = 3; // T block width (for wall collision)
+
+    this.numPix = 4; // num pixels in T block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🚔";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if T is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 1 && x < 0 || this.curRotation === 3 && x < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing T block */
+          case 0:
+            this.coords = [[x - 1, y - 1], [x, y - 1], [x, y], [x + 1, y - 1]];
             break;
-          case 'ascii':
-            ret = _asciiSlice(self, start, end);
+
+          /* left facing T block */
+
+          case 1:
+            this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 1, y + 1]];
             break;
-          case 'binary':
-            ret = _binarySlice(self, start, end);
+
+          /* up facing T block */
+
+          case 2:
+            this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
             break;
-          case 'base64':
-            ret = _base64Slice(self, start, end);
+
+          /* right facing T block */
+
+          case 3:
+            this.coords = [[x + 1, y + 1], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
             break;
-          case 'ucs2':
-          case 'ucs-2':
-          case 'utf16le':
-          case 'utf-16le':
-            ret = _utf16leSlice(self, start, end);
+        }
+      }
+    };
+  } // init I block (needs its initial coords)
+
+
+  _initI(x, y) {
+    this.height = 1; // I block height (for floor/block collision)
+
+    this.width = 4; // I block width (for wall collision)
+
+    this.numPix = 4; // num pixels in I block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🚀";
+    this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 3, y]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if I is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 2 || this.curRotation === 1 && x < 2) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* vert I block */
+          case 0:
+            this.coords = [[x - 2, y + 2], [x - 1, y + 2], [x, y + 2], [x + 1, y + 2]];
             break;
-          default:
-            throw new Error('Unknown encoding');
-        }
-        return ret;
-      };
 
-      Buffer.prototype.toJSON = function () {
-        return {
-          type: 'Buffer',
-          data: Array.prototype.slice.call(this._arr || this, 0)
-        };
-      };
+          /* horiz I block */
 
-      // copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
-      Buffer.prototype.copy = function (target, target_start, start, end) {
-        var source = this;
-
-        if (!start) start = 0;
-        if (!end && end !== 0) end = this.length;
-        if (!target_start) target_start = 0;
-
-        // Copy 0 bytes; we're done
-        if (end === start) return;
-        if (target.length === 0 || source.length === 0) return;
-
-        // Fatal error conditions
-        assert(end >= start, 'sourceEnd < sourceStart');
-        assert(target_start >= 0 && target_start < target.length, 'targetStart out of bounds');
-        assert(start >= 0 && start < source.length, 'sourceStart out of bounds');
-        assert(end >= 0 && end <= source.length, 'sourceEnd out of bounds');
-
-        // Are we oob?
-        if (end > this.length) end = this.length;
-        if (target.length - target_start < end - start) end = target.length - target_start + start;
-
-        var len = end - start;
-
-        if (len < 100 || !Buffer._useTypedArrays) {
-          for (var i = 0; i < len; i++) target[i + target_start] = this[i + start];
-        } else {
-          target._set(this.subarray(start, start + len), target_start);
-        }
-      };
-
-      function _base64Slice(buf, start, end) {
-        if (start === 0 && end === buf.length) {
-          return base64.fromByteArray(buf);
-        } else {
-          return base64.fromByteArray(buf.slice(start, end));
-        }
-      }
-
-      function _utf8Slice(buf, start, end) {
-        var res = '';
-        var tmp = '';
-        end = Math.min(buf.length, end);
-
-        for (var i = start; i < end; i++) {
-          if (buf[i] <= 0x7F) {
-            res += decodeUtf8Char(tmp) + String.fromCharCode(buf[i]);
-            tmp = '';
-          } else {
-            tmp += '%' + buf[i].toString(16);
-          }
-        }
-
-        return res + decodeUtf8Char(tmp);
-      }
-
-      function _asciiSlice(buf, start, end) {
-        var ret = '';
-        end = Math.min(buf.length, end);
-
-        for (var i = start; i < end; i++) ret += String.fromCharCode(buf[i]);
-        return ret;
-      }
-
-      function _binarySlice(buf, start, end) {
-        return _asciiSlice(buf, start, end);
-      }
-
-      function _hexSlice(buf, start, end) {
-        var len = buf.length;
-
-        if (!start || start < 0) start = 0;
-        if (!end || end < 0 || end > len) end = len;
-
-        var out = '';
-        for (var i = start; i < end; i++) {
-          out += toHex(buf[i]);
-        }
-        return out;
-      }
-
-      function _utf16leSlice(buf, start, end) {
-        var bytes = buf.slice(start, end);
-        var res = '';
-        for (var i = 0; i < bytes.length; i += 2) {
-          res += String.fromCharCode(bytes[i] + bytes[i + 1] * 256);
-        }
-        return res;
-      }
-
-      Buffer.prototype.slice = function (start, end) {
-        var len = this.length;
-        start = clamp(start, len, 0);
-        end = clamp(end, len, len);
-
-        if (Buffer._useTypedArrays) {
-          return Buffer._augment(this.subarray(start, end));
-        } else {
-          var sliceLen = end - start;
-          var newBuf = new Buffer(sliceLen, undefined, true);
-          for (var i = 0; i < sliceLen; i++) {
-            newBuf[i] = this[i + start];
-          }
-          return newBuf;
-        }
-      };
-
-      // `get` will be removed in Node 0.13+
-      Buffer.prototype.get = function (offset) {
-        console.log('.get() is deprecated. Access using array indexes instead.');
-        return this.readUInt8(offset);
-      };
-
-      // `set` will be removed in Node 0.13+
-      Buffer.prototype.set = function (v, offset) {
-        console.log('.set() is deprecated. Access using array indexes instead.');
-        return this.writeUInt8(v, offset);
-      };
-
-      Buffer.prototype.readUInt8 = function (offset, noAssert) {
-        if (!noAssert) {
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset < this.length, 'Trying to read beyond buffer length');
-        }
-
-        if (offset >= this.length) return;
-
-        return this[offset];
-      };
-
-      function _readUInt16(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 1 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        var val;
-        if (littleEndian) {
-          val = buf[offset];
-          if (offset + 1 < len) val |= buf[offset + 1] << 8;
-        } else {
-          val = buf[offset] << 8;
-          if (offset + 1 < len) val |= buf[offset + 1];
-        }
-        return val;
-      }
-
-      Buffer.prototype.readUInt16LE = function (offset, noAssert) {
-        return _readUInt16(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readUInt16BE = function (offset, noAssert) {
-        return _readUInt16(this, offset, false, noAssert);
-      };
-
-      function _readUInt32(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 3 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        var val;
-        if (littleEndian) {
-          if (offset + 2 < len) val = buf[offset + 2] << 16;
-          if (offset + 1 < len) val |= buf[offset + 1] << 8;
-          val |= buf[offset];
-          if (offset + 3 < len) val = val + (buf[offset + 3] << 24 >>> 0);
-        } else {
-          if (offset + 1 < len) val = buf[offset + 1] << 16;
-          if (offset + 2 < len) val |= buf[offset + 2] << 8;
-          if (offset + 3 < len) val |= buf[offset + 3];
-          val = val + (buf[offset] << 24 >>> 0);
-        }
-        return val;
-      }
-
-      Buffer.prototype.readUInt32LE = function (offset, noAssert) {
-        return _readUInt32(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readUInt32BE = function (offset, noAssert) {
-        return _readUInt32(this, offset, false, noAssert);
-      };
-
-      Buffer.prototype.readInt8 = function (offset, noAssert) {
-        if (!noAssert) {
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset < this.length, 'Trying to read beyond buffer length');
-        }
-
-        if (offset >= this.length) return;
-
-        var neg = this[offset] & 0x80;
-        if (neg) return (0xff - this[offset] + 1) * -1;else return this[offset];
-      };
-
-      function _readInt16(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 1 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        var val = _readUInt16(buf, offset, littleEndian, true);
-        var neg = val & 0x8000;
-        if (neg) return (0xffff - val + 1) * -1;else return val;
-      }
-
-      Buffer.prototype.readInt16LE = function (offset, noAssert) {
-        return _readInt16(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readInt16BE = function (offset, noAssert) {
-        return _readInt16(this, offset, false, noAssert);
-      };
-
-      function _readInt32(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 3 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        var val = _readUInt32(buf, offset, littleEndian, true);
-        var neg = val & 0x80000000;
-        if (neg) return (0xffffffff - val + 1) * -1;else return val;
-      }
-
-      Buffer.prototype.readInt32LE = function (offset, noAssert) {
-        return _readInt32(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readInt32BE = function (offset, noAssert) {
-        return _readInt32(this, offset, false, noAssert);
-      };
-
-      function _readFloat(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset + 3 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        return ieee754.read(buf, offset, littleEndian, 23, 4);
-      }
-
-      Buffer.prototype.readFloatLE = function (offset, noAssert) {
-        return _readFloat(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readFloatBE = function (offset, noAssert) {
-        return _readFloat(this, offset, false, noAssert);
-      };
-
-      function _readDouble(buf, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset + 7 < buf.length, 'Trying to read beyond buffer length');
-        }
-
-        return ieee754.read(buf, offset, littleEndian, 52, 8);
-      }
-
-      Buffer.prototype.readDoubleLE = function (offset, noAssert) {
-        return _readDouble(this, offset, true, noAssert);
-      };
-
-      Buffer.prototype.readDoubleBE = function (offset, noAssert) {
-        return _readDouble(this, offset, false, noAssert);
-      };
-
-      Buffer.prototype.writeUInt8 = function (value, offset, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset < this.length, 'trying to write beyond buffer length');
-          verifuint(value, 0xff);
-        }
-
-        if (offset >= this.length) return;
-
-        this[offset] = value;
-      };
-
-      function _writeUInt16(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 1 < buf.length, 'trying to write beyond buffer length');
-          verifuint(value, 0xffff);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        for (var i = 0, j = Math.min(len - offset, 2); i < j; i++) {
-          buf[offset + i] = (value & 0xff << 8 * (littleEndian ? i : 1 - i)) >>> (littleEndian ? i : 1 - i) * 8;
-        }
-      }
-
-      Buffer.prototype.writeUInt16LE = function (value, offset, noAssert) {
-        _writeUInt16(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeUInt16BE = function (value, offset, noAssert) {
-        _writeUInt16(this, value, offset, false, noAssert);
-      };
-
-      function _writeUInt32(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 3 < buf.length, 'trying to write beyond buffer length');
-          verifuint(value, 0xffffffff);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        for (var i = 0, j = Math.min(len - offset, 4); i < j; i++) {
-          buf[offset + i] = value >>> (littleEndian ? i : 3 - i) * 8 & 0xff;
-        }
-      }
-
-      Buffer.prototype.writeUInt32LE = function (value, offset, noAssert) {
-        _writeUInt32(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeUInt32BE = function (value, offset, noAssert) {
-        _writeUInt32(this, value, offset, false, noAssert);
-      };
-
-      Buffer.prototype.writeInt8 = function (value, offset, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset < this.length, 'Trying to write beyond buffer length');
-          verifsint(value, 0x7f, -0x80);
-        }
-
-        if (offset >= this.length) return;
-
-        if (value >= 0) this.writeUInt8(value, offset, noAssert);else this.writeUInt8(0xff + value + 1, offset, noAssert);
-      };
-
-      function _writeInt16(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 1 < buf.length, 'Trying to write beyond buffer length');
-          verifsint(value, 0x7fff, -0x8000);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        if (value >= 0) _writeUInt16(buf, value, offset, littleEndian, noAssert);else _writeUInt16(buf, 0xffff + value + 1, offset, littleEndian, noAssert);
-      }
-
-      Buffer.prototype.writeInt16LE = function (value, offset, noAssert) {
-        _writeInt16(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeInt16BE = function (value, offset, noAssert) {
-        _writeInt16(this, value, offset, false, noAssert);
-      };
-
-      function _writeInt32(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 3 < buf.length, 'Trying to write beyond buffer length');
-          verifsint(value, 0x7fffffff, -0x80000000);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        if (value >= 0) _writeUInt32(buf, value, offset, littleEndian, noAssert);else _writeUInt32(buf, 0xffffffff + value + 1, offset, littleEndian, noAssert);
-      }
-
-      Buffer.prototype.writeInt32LE = function (value, offset, noAssert) {
-        _writeInt32(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeInt32BE = function (value, offset, noAssert) {
-        _writeInt32(this, value, offset, false, noAssert);
-      };
-
-      function _writeFloat(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 3 < buf.length, 'Trying to write beyond buffer length');
-          verifIEEE754(value, 3.4028234663852886e+38, -3.4028234663852886e+38);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        ieee754.write(buf, value, offset, littleEndian, 23, 4);
-      }
-
-      Buffer.prototype.writeFloatLE = function (value, offset, noAssert) {
-        _writeFloat(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeFloatBE = function (value, offset, noAssert) {
-        _writeFloat(this, value, offset, false, noAssert);
-      };
-
-      function _writeDouble(buf, value, offset, littleEndian, noAssert) {
-        if (!noAssert) {
-          assert(value !== undefined && value !== null, 'missing value');
-          assert(typeof littleEndian === 'boolean', 'missing or invalid endian');
-          assert(offset !== undefined && offset !== null, 'missing offset');
-          assert(offset + 7 < buf.length, 'Trying to write beyond buffer length');
-          verifIEEE754(value, 1.7976931348623157E+308, -1.7976931348623157E+308);
-        }
-
-        var len = buf.length;
-        if (offset >= len) return;
-
-        ieee754.write(buf, value, offset, littleEndian, 52, 8);
-      }
-
-      Buffer.prototype.writeDoubleLE = function (value, offset, noAssert) {
-        _writeDouble(this, value, offset, true, noAssert);
-      };
-
-      Buffer.prototype.writeDoubleBE = function (value, offset, noAssert) {
-        _writeDouble(this, value, offset, false, noAssert);
-      };
-
-      // fill(value, start=0, end=buffer.length)
-      Buffer.prototype.fill = function (value, start, end) {
-        if (!value) value = 0;
-        if (!start) start = 0;
-        if (!end) end = this.length;
-
-        if (typeof value === 'string') {
-          value = value.charCodeAt(0);
-        }
-
-        assert(typeof value === 'number' && !isNaN(value), 'value is not a number');
-        assert(end >= start, 'end < start');
-
-        // Fill 0 bytes; we're done
-        if (end === start) return;
-        if (this.length === 0) return;
-
-        assert(start >= 0 && start < this.length, 'start out of bounds');
-        assert(end >= 0 && end <= this.length, 'end out of bounds');
-
-        for (var i = start; i < end; i++) {
-          this[i] = value;
-        }
-      };
-
-      Buffer.prototype.inspect = function () {
-        var out = [];
-        var len = this.length;
-        for (var i = 0; i < len; i++) {
-          out[i] = toHex(this[i]);
-          if (i === exports.INSPECT_MAX_BYTES) {
-            out[i + 1] = '...';
+          case 1:
+            this.coords = [[x + 2, y - 2], [x + 2, y - 1], [x + 2, y], [x + 2, y + 1]];
             break;
-          }
-        }
-        return '<Buffer ' + out.join(' ') + '>';
-      };
-
-      /**
-       * Creates a new `ArrayBuffer` with the *copied* memory of the buffer instance.
-       * Added in Node 0.12. Only available in browsers that support ArrayBuffer.
-       */
-      Buffer.prototype.toArrayBuffer = function () {
-        if (typeof Uint8Array !== 'undefined') {
-          if (Buffer._useTypedArrays) {
-            return new Buffer(this).buffer;
-          } else {
-            var buf = new Uint8Array(this.length);
-            for (var i = 0, len = buf.length; i < len; i += 1) buf[i] = this[i];
-            return buf.buffer;
-          }
-        } else {
-          throw new Error('Buffer.toArrayBuffer not supported in this browser');
-        }
-      };
-
-      // HELPER FUNCTIONS
-      // ================
-
-      function stringtrim(str) {
-        if (str.trim) return str.trim();
-        return str.replace(/^\s+|\s+$/g, '');
-      }
-
-      var BP = Buffer.prototype;
-
-      /**
-       * Augment a Uint8Array *instance* (not the Uint8Array class!) with Buffer methods
-       */
-      Buffer._augment = function (arr) {
-        arr._isBuffer = true;
-
-        // save reference to original Uint8Array get/set methods before overwriting
-        arr._get = arr.get;
-        arr._set = arr.set;
-
-        // deprecated, will be removed in node 0.13+
-        arr.get = BP.get;
-        arr.set = BP.set;
-
-        arr.write = BP.write;
-        arr.toString = BP.toString;
-        arr.toLocaleString = BP.toString;
-        arr.toJSON = BP.toJSON;
-        arr.copy = BP.copy;
-        arr.slice = BP.slice;
-        arr.readUInt8 = BP.readUInt8;
-        arr.readUInt16LE = BP.readUInt16LE;
-        arr.readUInt16BE = BP.readUInt16BE;
-        arr.readUInt32LE = BP.readUInt32LE;
-        arr.readUInt32BE = BP.readUInt32BE;
-        arr.readInt8 = BP.readInt8;
-        arr.readInt16LE = BP.readInt16LE;
-        arr.readInt16BE = BP.readInt16BE;
-        arr.readInt32LE = BP.readInt32LE;
-        arr.readInt32BE = BP.readInt32BE;
-        arr.readFloatLE = BP.readFloatLE;
-        arr.readFloatBE = BP.readFloatBE;
-        arr.readDoubleLE = BP.readDoubleLE;
-        arr.readDoubleBE = BP.readDoubleBE;
-        arr.writeUInt8 = BP.writeUInt8;
-        arr.writeUInt16LE = BP.writeUInt16LE;
-        arr.writeUInt16BE = BP.writeUInt16BE;
-        arr.writeUInt32LE = BP.writeUInt32LE;
-        arr.writeUInt32BE = BP.writeUInt32BE;
-        arr.writeInt8 = BP.writeInt8;
-        arr.writeInt16LE = BP.writeInt16LE;
-        arr.writeInt16BE = BP.writeInt16BE;
-        arr.writeInt32LE = BP.writeInt32LE;
-        arr.writeInt32BE = BP.writeInt32BE;
-        arr.writeFloatLE = BP.writeFloatLE;
-        arr.writeFloatBE = BP.writeFloatBE;
-        arr.writeDoubleLE = BP.writeDoubleLE;
-        arr.writeDoubleBE = BP.writeDoubleBE;
-        arr.fill = BP.fill;
-        arr.inspect = BP.inspect;
-        arr.toArrayBuffer = BP.toArrayBuffer;
-
-        return arr;
-      };
-
-      // slice(start, end)
-      function clamp(index, len, defaultValue) {
-        if (typeof index !== 'number') return defaultValue;
-        index = ~~index; // Coerce to integer.
-        if (index >= len) return len;
-        if (index >= 0) return index;
-        index += len;
-        if (index >= 0) return index;
-        return 0;
-      }
-
-      function coerce(length) {
-        // Coerce length to a number (possibly NaN), round up
-        // in case it's fractional (e.g. 123.456) then do a
-        // double negate to coerce a NaN to 0. Easy, right?
-        length = ~~Math.ceil(+length);
-        return length < 0 ? 0 : length;
-      }
-
-      function isArray(subject) {
-        return (Array.isArray || function (subject) {
-          return Object.prototype.toString.call(subject) === '[object Array]';
-        })(subject);
-      }
-
-      function isArrayish(subject) {
-        return isArray(subject) || Buffer.isBuffer(subject) || subject && typeof subject === 'object' && typeof subject.length === 'number';
-      }
-
-      function toHex(n) {
-        if (n < 16) return '0' + n.toString(16);
-        return n.toString(16);
-      }
-
-      function utf8ToBytes(str) {
-        var byteArray = [];
-        for (var i = 0; i < str.length; i++) {
-          var b = str.charCodeAt(i);
-          if (b <= 0x7F) byteArray.push(str.charCodeAt(i));else {
-            var start = i;
-            if (b >= 0xD800 && b <= 0xDFFF) i++;
-            var h = encodeURIComponent(str.slice(start, i + 1)).substr(1).split('%');
-            for (var j = 0; j < h.length; j++) byteArray.push(parseInt(h[j], 16));
-          }
-        }
-        return byteArray;
-      }
-
-      function asciiToBytes(str) {
-        var byteArray = [];
-        for (var i = 0; i < str.length; i++) {
-          // Node's code seems to be doing this and not & 0x7F..
-          byteArray.push(str.charCodeAt(i) & 0xFF);
-        }
-        return byteArray;
-      }
-
-      function utf16leToBytes(str) {
-        var c, hi, lo;
-        var byteArray = [];
-        for (var i = 0; i < str.length; i++) {
-          c = str.charCodeAt(i);
-          hi = c >> 8;
-          lo = c % 256;
-          byteArray.push(lo);
-          byteArray.push(hi);
-        }
-
-        return byteArray;
-      }
-
-      function base64ToBytes(str) {
-        return base64.toByteArray(str);
-      }
-
-      function blitBuffer(src, dst, offset, length) {
-        var pos;
-        for (var i = 0; i < length; i++) {
-          if (i + offset >= dst.length || i >= src.length) break;
-          dst[i + offset] = src[i];
-        }
-        return i;
-      }
-
-      function decodeUtf8Char(str) {
-        try {
-          return decodeURIComponent(str);
-        } catch (err) {
-          return String.fromCharCode(0xFFFD); // UTF 8 invalid char
         }
       }
+    };
+  } // init I block (needs its initial coords)
 
-      /*
-       * We have to make sure that the value is a valid integer. This means that it
-       * is non-negative. It has no fractional component and that it does not
-       * exceed the maximum allowed value.
-       */
-      function verifuint(value, max) {
-        assert(typeof value === 'number', 'cannot write a non-number as a number');
-        assert(value >= 0, 'specified a negative value for writing an unsigned value');
-        assert(value <= max, 'value is larger than maximum value for type');
-        assert(Math.floor(value) === value, 'value has a fractional component');
+
+  _initO(x, y) {
+    this.height = 2; // I block height (for floor/block collision)
+
+    this.width = 2; // I block width (for wall collision)
+
+    this.numPix = 4; // num pixels in I block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "📙";
+    this.coords = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+
+    this.rotate = function () {// no rotation on O block;
+    };
+  }
+
+};
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJtb2R1bGUiLCJleHBvcnRzIiwiQmxvY2siLCJjb25zdHJ1Y3RvciIsImxldHRlciIsIngiLCJ5IiwidG9VcHBlckNhc2UiLCJfaW5pdEwiLCJoZWlnaHQiLCJ3aWR0aCIsIm51bVBpeCIsImN1clJvdGF0aW9uIiwiZW1vamkiLCJjb29yZHMiLCJyb3RhdGUiLCJfaW5pdEoiLCJfaW5pdFoiLCJfaW5pdFMiLCJfaW5pdFQiLCJfaW5pdEkiLCJfaW5pdE8iXSwic291cmNlcyI6WyJCbG9jay5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyIvLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4vLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0gQmxvY2sgQ2xhc3MgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4vLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG5cbi8vIEJsb2NrcyBoYXZlIGxldHRlciBuYW1lOiBJLCBULCBKLCBMICYgTyAoaHR0cDovL2kuaW1ndXIuY29tLzlaMG9KWGUucG5nKVxuLy8gQWxsIGJsb2NrIG1vdmVtZW50L2NvbGxpc2lvbiBjYWxjdWxhdGVkIGZyb20gYmxvY2sgY29vcmRpYXRlc1xuLy8gQmxvY2tzIGFyZSBtYWRlIG9mIDQgXCJwaXhlbHNcIlxuLy8gRmlyc3QgYmxvY2sgXCJwaXhlbFwiIGlzIHRvcCBsZWZ0IHBpeGVsXG4vLyBTdWJzZXF1ZW50IGJsb2NrIGNvb3JkaW5hdGVzIGFyZSBjYWxjdWxhdGVkIGZyb20gZmlyc3QgcGl4ZWxcbi8vIFJvdGF0aW9ucyBiYXNlZCBvbiBORVMgY29udHJvbHMgKGh0dHA6Ly9pbWd1ci5jb20vYS9JVlJyZilcblxuLy8gRm9yIGNvbGxpc2lvbiBkZXRlY3Rpb24sIG1ha2UgZmlyc3QgY29vcmRpbmF0ZSBwYWlyIGluIGNvb3Jkc1xuLy8gYXJyYXkgdGhlIGJsb2NrJ3MgZmFyIGxlZnQgcGl4ZWwuICBNYWtlIHRoZSBsYXN0IGNvb3JpbmF0ZVxuLy8gY29vcmRpbmF0ZSBwYWlyIHRoZSBmYXIgcmlnaHQgcGl4ZWwuXG5cblxubW9kdWxlLmV4cG9ydHMgPSBjbGFzcyBCbG9jayB7XG5cbiAgLy8gYmxvY2sgY29uc3RydWN0b3IgKG5lZWRzIGJsb2NrIGxldHRlciAmIGluaXRpYWwgY29vcmRzKVxuICBjb25zdHJ1Y3RvcihsZXR0ZXIsIHgsIHkpXG4gIHtcbiAgICB0aGlzLmxldHRlciA9IGxldHRlci50b1VwcGVyQ2FzZSgpO1xuICAgIHRoaXNbYF9pbml0JHt0aGlzLmxldHRlcn1gXSh4LCB5KTtcbiAgfVxuXG5cbiAgICAvLyBpbml0IEwgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgICBfaW5pdEwoeCwgeSlcbiAgICB7XG4gICAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEwgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgICAgdGhpcy53aWR0aCA9IDM7ICAgICAgICAvLyBMIGJsb2NrIHdpZHRoIChmb3Igd2FsbCBjb2xsaXNpb24pXG4gICAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gTCBibG9ja1xuICAgICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICAgIHRoaXMuZW1vamkgPSBcIvCfmIBcIjtcbiAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4LCB5ICsgMSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDIsIHkgXSAgXTtcbiAgICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG5cbiAgICAgICAgLy8gZ2V0cyBjdXJyZW50IHggJiB5XG4gICAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICAgIGxldCB5ID0gdGhpcy5jb29yZHNbMF1bMV07XG5cbiAgICAgICAgLy8gaWYgTCBpcyB2ZXJ0LCBjaGVja3MgZm9yIGNvbGxpc2lvbnNcbiAgICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgICAgfHwgKHRoaXMuY3VyUm90YXRpb24gPT09IDEgJiYgeCA8IDEpXG4gICAgICAgICAgIHx8ICh0aGlzLmN1clJvdGF0aW9uID09PSAxICYmIHggPiA3KVxuICAgICAgICAgICB8fCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgICAgcmV0dXJuO1xuICAgICAgICB9XG5cbiAgICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgICAgdGhpcy5jdXJSb3RhdGlvbiA9ICh0aGlzLmN1clJvdGF0aW9uICsgMSkgJSA0O1xuXG4gICAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgICAvKiBkb3duIGZhY2luZyBMIGJsb2NrICovXG4gICAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAxLCB5ICsgMSBdLCBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxIF0sIFsgeCAtIDEsIHkgKyAyIF0gXTtcbiAgICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAgIC8qIGxlZnQgZmFjaW5nIEwgYmxvY2sgKi9cbiAgICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSAtIDEgXSwgWyB4ICsgMSwgeSAtIDFdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgKyAxIF0gIF07XG4gICAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgICAvKiB1cCBmYWNpbmcgTCBibG9jayAqL1xuICAgICAgICAgICAgY2FzZSAyOlxuICAgICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4LCB5ICsgMSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5ICsgMSBdLCBbIHggKyAyLCB5IF0gIF07XG4gICAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgICAvKiByaWdodCBmYWNpbmcgTCBibG9jayAqL1xuICAgICAgICAgICAgY2FzZSAzOlxuICAgICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMSwgeSAtIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5ICsgMSBdICBdO1xuICAgICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIH1cblxuICAgICAgICB9XG5cbiAgICAgIH07XG4gICAgfVxuXG5cblxuICAvLyBpbml0IEogYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRKKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEogYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gSiBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBKIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5KpXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDIsIHkgXSwgWyB4ICsgMiwgeSArIDEgXSAgXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBKIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgIHx8ICh0aGlzLmN1clJvdGF0aW9uID09PSAxICYmIHggPCAxKVxuICAgICAgICAgfHwgKHRoaXMuY3VyUm90YXRpb24gPT09IDEgJiYgeCA+IDcpXG4gICAgICAgICB8fCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDQ7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIGRvd24gZmFjaW5nIEogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4IC0gMSwgeSAtIDEgXSwgWyB4LCB5IC0gMSBdLCBbIHggKyAxLCB5IC0gMSBdLCBbIHggKyAxLCB5IF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogbGVmdCBmYWNpbmcgSiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdICBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiB1cCBmYWNpbmcgSiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMjpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgLSAyIF0sIFsgeCwgeSAtIDEgXSwgWyB4ICsgMSwgeSAtIDEgXSwgWyB4ICsgMiwgeSAtIDEgXSAgXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogcmlnaHQgZmFjaW5nIEogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDM6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMSwgeSArIDIgXSwgWyB4ICsgMSwgeSArIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAyLCB5IF0gIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IFogYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRaKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIFogYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gWiBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBaIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5C2XCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgKyAxIF0sIFsgeCArIDIsIHkgKyAxIF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBaIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKHRoaXMuY3VyUm90YXRpb24gPT09IDAgJiYgeSA8IDEpIHtcbiAgICAgICAgcmV0dXJuO1xuICAgICAgfVxuXG4gICAgICBpZiAoICh4ID49IDApICYmICh4IDwgOSkgKSB7XG5cbiAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgIHRoaXMuY3VyUm90YXRpb24gPSAodGhpcy5jdXJSb3RhdGlvbiArIDEpICUgMjtcblxuICAgICAgICAvLyByb3RhdGVzIHRvIG5ldyBjdXJSb3RhdGlvblxuICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgLyogZG93biBmYWNpbmcgWiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4IC0gMSwgeSBdLCBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiB2ZXJ0IFogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDE6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4LCB5IF0sIFsgeCwgeSArIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IFMgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRTKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIFMgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gUyBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBTIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5CuXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgLSAxIF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBTIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKHRoaXMuY3VyUm90YXRpb24gPT09IDAgJiYgeSA8IDEpIHtcbiAgICAgICAgcmV0dXJuO1xuICAgICAgfVxuXG4gICAgICBpZiAoICh4ID49IDApICYmICh4IDwgOSkgKSB7XG5cbiAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgIHRoaXMuY3VyUm90YXRpb24gPSAodGhpcy5jdXJSb3RhdGlvbiArIDEpICUgMjtcblxuICAgICAgICAvLyByb3RhdGVzIHRvIG5ldyBjdXJSb3RhdGlvblxuICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgLyogZG93biBmYWNpbmcgUyBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAxLCB5ICsgMSBdLCBbIHgsIHkgKyAxIF0sIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogdmVydCBTIGJsb2NrICovXG4gICAgICAgICAgY2FzZSAxOlxuICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDEsIHkgLSAyIF0sIFsgeCArIDIsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgfVxuXG4gICAgICB9XG5cbiAgICB9O1xuICB9XG5cbiAgLy8gaW5pdCBUIGJsb2NrIChuZWVkcyBpdHMgaW5pdGlhbCBjb29yZHMpXG4gIF9pbml0VCh4LCB5KVxuICB7XG4gICAgdGhpcy5oZWlnaHQgPSAyOyAgICAgICAvLyBUIGJsb2NrIGhlaWdodCAoZm9yIGZsb29yL2Jsb2NrIGNvbGxpc2lvbilcbiAgICB0aGlzLndpZHRoID0gMzsgICAgICAgIC8vIFQgYmxvY2sgd2lkdGggKGZvciB3YWxsIGNvbGxpc2lvbilcbiAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gVCBibG9ja1xuICAgIHRoaXMuY3VyUm90YXRpb24gPSAwOyAgLy8gY3VycmVudCBwb3MgaW4gcm90YXRpb25zIGFycmF5XG4gICAgdGhpcy5lbW9qaSA9IFwi8J+alFwiO1xuICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5IF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBUIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMSAmJiB4ID4gNylcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMSAmJiB4IDwgMClcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDQ7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIGRvd24gZmFjaW5nIFQgYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4IC0gMSwgeSAtIDEgXSwgWyB4ICwgeSAtIDEgXSwgWyB4LCB5IF0sIFsgeCArIDEsIHkgLSAxIF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogbGVmdCBmYWNpbmcgVCBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdLCBbIHggKyAxLCB5ICsgMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIC8qIHVwIGZhY2luZyBUIGJsb2NrICovXG4gICAgICAgICAgY2FzZSAyOlxuICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiByaWdodCBmYWNpbmcgVCBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMzpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgfVxuXG4gICAgICB9XG5cbiAgICB9O1xuICB9XG5cbiAgLy8gaW5pdCBJIGJsb2NrIChuZWVkcyBpdHMgaW5pdGlhbCBjb29yZHMpXG4gIF9pbml0SSh4LCB5KVxuICB7XG4gICAgdGhpcy5oZWlnaHQgPSAxOyAgICAgICAvLyBJIGJsb2NrIGhlaWdodCAoZm9yIGZsb29yL2Jsb2NrIGNvbGxpc2lvbilcbiAgICB0aGlzLndpZHRoID0gNDsgICAgICAgIC8vIEkgYmxvY2sgd2lkdGggKGZvciB3YWxsIGNvbGxpc2lvbilcbiAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gSSBibG9ja1xuICAgIHRoaXMuY3VyUm90YXRpb24gPSAwOyAgLy8gY3VycmVudCBwb3MgaW4gcm90YXRpb25zIGFycmF5XG4gICAgdGhpcy5lbW9qaSA9IFwi8J+agFwiO1xuICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAyLCB5IF0sIFsgeCArIDMsIHkgXSBdO1xuICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG5cbiAgICAgIC8vIGdldHMgY3VycmVudCB4ICYgeVxuICAgICAgbGV0IHggPSB0aGlzLmNvb3Jkc1swXVswXTtcbiAgICAgIGxldCB5ID0gdGhpcy5jb29yZHNbMF1bMV07XG5cbiAgICAgIC8vIGlmIEkgaXMgdmVydCwgY2hlY2tzIGZvciBjb2xsaXNpb25zXG4gICAgICBpZiAoICggKCB0aGlzLmN1clJvdGF0aW9uID09PSAwICkgJiYgKHkgPCAyKSApXG4gICAgICAgICB8fCAoICh0aGlzLmN1clJvdGF0aW9uID09PSAxICkgJiYgKCB4IDwgMiApICkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDI7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIHZlcnQgSSBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAyICwgeSArIDIgXSwgWyB4IC0gMSAsIHkgKyAyIF0sIFsgeCAsIHkgKyAyIF0sIFsgeCArIDEgLCB5ICsgMiBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIC8qIGhvcml6IEkgYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDE6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMiwgeSAtIDIgXSwgWyB4ICsgMiwgeSAtIDEgXSwgWyB4ICsgMiwgeSBdLCBbIHggKyAyLCB5ICsgMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IEkgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRPKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEkgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAyOyAgICAgICAgLy8gSSBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBJIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5OZXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCwgeSArIDEgXSwgWyB4ICsgMSwgeSArIDEgXSBdO1xuICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG4gICAgICAvLyBubyByb3RhdGlvbiBvbiBPIGJsb2NrO1xuICAgIH07XG4gIH1cblxufTtcbiJdLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBO0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBRUE7QUFDQTtBQUNBO0FBR0FBLE1BQU0sQ0FBQ0MsT0FBUCxHQUFpQixNQUFNQyxLQUFOLENBQVk7RUFFM0I7RUFDQUMsV0FBVyxDQUFDQyxNQUFELEVBQVNDLENBQVQsRUFBWUMsQ0FBWixFQUNYO0lBQ0UsS0FBS0YsTUFBTCxHQUFjQSxNQUFNLENBQUNHLFdBQVAsRUFBZDtJQUNBLEtBQU0sUUFBTyxLQUFLSCxNQUFPLEVBQXpCLEVBQTRCQyxDQUE1QixFQUErQkMsQ0FBL0I7RUFDRCxDQVAwQixDQVV6Qjs7O0VBQ0FFLE1BQU0sQ0FBQ0gsQ0FBRCxFQUFJQyxDQUFKLEVBQ047SUFDRSxLQUFLRyxNQUFMLEdBQWMsQ0FBZCxDQURGLENBQ3lCOztJQUN2QixLQUFLQyxLQUFMLEdBQWEsQ0FBYixDQUZGLENBRXlCOztJQUN2QixLQUFLQyxNQUFMLEdBQWMsQ0FBZCxDQUhGLENBR3lCOztJQUN2QixLQUFLQyxXQUFMLEdBQW1CLENBQW5CLENBSkYsQ0FJeUI7O0lBQ3ZCLEtBQUtDLEtBQUwsR0FBYSxJQUFiO0lBQ0EsS0FBS0MsTUFBTCxHQUFjLENBQUUsQ0FBRVQsQ0FBRixFQUFLQyxDQUFMLENBQUYsRUFBWSxDQUFFRCxDQUFGLEVBQUtDLENBQUMsR0FBRyxDQUFULENBQVosRUFBMEIsQ0FBRUQsQ0FBQyxHQUFHLENBQU4sRUFB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
+},{}],2:[function(require,module,exports){
+// -------------------------------------------------------------
+// --------------------- Block Class ---------------------------
+// -------------------------------------------------------------
+// Blocks have letter name: I, T, J, L & O (http://i.imgur.com/9Z0oJXe.png)
+// All block movement/collision calculated from block coordiates
+// Blocks are made of 4 "pixels"
+// First block "pixel" is top left pixel
+// Subsequent block coordinates are calculated from first pixel
+// Rotations based on NES controls (http://imgur.com/a/IVRrf)
+// For collision detection, make first coordinate pair in coords
+// array the block's far left pixel.  Make the last coorinate
+// coordinate pair the far right pixel.
+module.exports = class Block {
+  // block constructor (needs block letter & initial coords)
+  constructor(letter, x, y) {
+    this.letter = letter.toUpperCase();
+    this[`_init${this.letter}`](x, y);
+  } // init L block (needs its initial coords)
+
+
+  _initL(x, y) {
+    this.height = 2; // L block height (for floor/block collision)
+
+    this.width = 3; // L block width (for wall collision)
+
+    this.numPix = 4; // num pixels in L block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "😀";
+    this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 2, y]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if L is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
+        return;
       }
 
-      function verifsint(value, max, min) {
-        assert(typeof value === 'number', 'cannot write a non-number as a number');
-        assert(value <= max, 'value larger than maximum allowed value');
-        assert(value >= min, 'value smaller than minimum allowed value');
-        assert(Math.floor(value) === value, 'value has a fractional component');
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing L block */
+          case 0:
+            this.coords = [[x - 1, y + 1], [x, y + 1], [x + 1, y + 1], [x - 1, y + 2]];
+            break;
+
+          /* left facing L block */
+
+          case 1:
+            this.coords = [[x, y - 1], [x + 1, y - 1], [x + 1, y], [x + 1, y + 1]];
+            break;
+
+          /* up facing L block */
+
+          case 2:
+            this.coords = [[x, y + 1], [x + 1, y + 1], [x + 2, y + 1], [x + 2, y]];
+            break;
+
+          /* right facing L block */
+
+          case 3:
+            this.coords = [[x + 1, y - 1], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
+            break;
+        }
+      }
+    };
+  } // init J block (needs its initial coords)
+
+
+  _initJ(x, y) {
+    this.height = 2; // J block height (for floor/block collision)
+
+    this.width = 3; // J block width (for wall collision)
+
+    this.numPix = 4; // num pixels in J block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "💩";
+    this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 2, y + 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if J is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
+        return;
       }
 
-      function verifIEEE754(value, max, min) {
-        assert(typeof value === 'number', 'cannot write a non-number as a number');
-        assert(value <= max, 'value larger than maximum allowed value');
-        assert(value >= min, 'value smaller than minimum allowed value');
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing J block */
+          case 0:
+            this.coords = [[x - 1, y - 1], [x, y - 1], [x + 1, y - 1], [x + 1, y]];
+            break;
+
+          /* left facing J block */
+
+          case 1:
+            this.coords = [[x, y + 1], [x + 1, y + 1], [x + 1, y], [x + 1, y - 1]];
+            break;
+
+          /* up facing J block */
+
+          case 2:
+            this.coords = [[x, y - 2], [x, y - 1], [x + 1, y - 1], [x + 2, y - 1]];
+            break;
+
+          /* right facing J block */
+
+          case 3:
+            this.coords = [[x + 1, y + 2], [x + 1, y + 1], [x + 1, y], [x + 2, y]];
+            break;
+        }
+      }
+    };
+  } // init Z block (needs its initial coords)
+
+
+  _initZ(x, y) {
+    this.height = 2; // Z block height (for floor/block collision)
+
+    this.width = 3; // Z block width (for wall collision)
+
+    this.numPix = 4; // num pixels in Z block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🐶";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if Z is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1) {
+        return;
       }
 
-      function assert(test, message) {
-        if (!test) throw new Error(message || 'Failed assertion');
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing Z block */
+          case 0:
+            this.coords = [[x, y], [x - 1, y], [x, y + 1], [x + 1, y + 1]];
+            break;
+
+          /* vert Z block */
+
+          case 1:
+            this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 1, y - 1]];
+            break;
+        }
       }
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/../node_modules/buffer/index.js", "/../node_modules/buffer");
-  }, { "base64-js": 1, "buffer": 2, "ieee754": 3, "pBGvAp": 4 }], 3: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      exports.read = function (buffer, offset, isLE, mLen, nBytes) {
-        var e, m;
-        var eLen = nBytes * 8 - mLen - 1;
-        var eMax = (1 << eLen) - 1;
-        var eBias = eMax >> 1;
-        var nBits = -7;
-        var i = isLE ? nBytes - 1 : 0;
-        var d = isLE ? -1 : 1;
-        var s = buffer[offset + i];
+    };
+  } // init S block (needs its initial coords)
 
-        i += d;
 
-        e = s & (1 << -nBits) - 1;
-        s >>= -nBits;
-        nBits += eLen;
-        for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+  _initS(x, y) {
+    this.height = 2; // S block height (for floor/block collision)
 
-        m = e & (1 << -nBits) - 1;
-        e >>= -nBits;
-        nBits += mLen;
-        for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+    this.width = 3; // S block width (for wall collision)
 
-        if (e === 0) {
-          e = 1 - eBias;
-        } else if (e === eMax) {
-          return m ? NaN : (s ? -1 : 1) * Infinity;
-        } else {
-          m = m + Math.pow(2, mLen);
-          e = e - eBias;
+    this.numPix = 4; // num pixels in S block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🐮";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y - 1]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if S is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing S block */
+          case 0:
+            this.coords = [[x - 1, y + 1], [x, y + 1], [x, y], [x + 1, y]];
+            break;
+
+          /* vert S block */
+
+          case 1:
+            this.coords = [[x + 1, y - 1], [x + 1, y - 2], [x + 2, y - 1], [x + 2, y]];
+            break;
         }
-        return (s ? -1 : 1) * m * Math.pow(2, e - mLen);
-      };
+      }
+    };
+  } // init T block (needs its initial coords)
 
-      exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
-        var e, m, c;
-        var eLen = nBytes * 8 - mLen - 1;
-        var eMax = (1 << eLen) - 1;
-        var eBias = eMax >> 1;
-        var rt = mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0;
-        var i = isLE ? 0 : nBytes - 1;
-        var d = isLE ? 1 : -1;
-        var s = value < 0 || value === 0 && 1 / value < 0 ? 1 : 0;
 
-        value = Math.abs(value);
+  _initT(x, y) {
+    this.height = 2; // T block height (for floor/block collision)
 
-        if (isNaN(value) || value === Infinity) {
-          m = isNaN(value) ? 1 : 0;
-          e = eMax;
-        } else {
-          e = Math.floor(Math.log(value) / Math.LN2);
-          if (value * (c = Math.pow(2, -e)) < 1) {
-            e--;
-            c *= 2;
-          }
-          if (e + eBias >= 1) {
-            value += rt / c;
-          } else {
-            value += rt * Math.pow(2, 1 - eBias);
-          }
-          if (value * c >= 2) {
-            e++;
-            c /= 2;
-          }
+    this.width = 3; // T block width (for wall collision)
 
-          if (e + eBias >= eMax) {
-            m = 0;
-            e = eMax;
-          } else if (e + eBias >= 1) {
-            m = (value * c - 1) * Math.pow(2, mLen);
-            e = e + eBias;
-          } else {
-            m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen);
-            e = 0;
-          }
+    this.numPix = 4; // num pixels in T block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "🚔";
+    this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if T is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 1 && x < 0 || this.curRotation === 3 && x < 1) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 4; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* down facing T block */
+          case 0:
+            this.coords = [[x - 1, y - 1], [x, y - 1], [x, y], [x + 1, y - 1]];
+            break;
+
+          /* left facing T block */
+
+          case 1:
+            this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 1, y + 1]];
+            break;
+
+          /* up facing T block */
+
+          case 2:
+            this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
+            break;
+
+          /* right facing T block */
+
+          case 3:
+            this.coords = [[x + 1, y + 1], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
+            break;
         }
+      }
+    };
+  } // init I block (needs its initial coords)
 
-        for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
 
-        e = e << mLen | m;
-        eLen += mLen;
-        for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+  _initI(x, y) {
+    this.height = 1; // I block height (for floor/block collision)
 
-        buffer[offset + i - d] |= s * 128;
-      };
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/../node_modules/ieee754/index.js", "/../node_modules/ieee754");
-  }, { "buffer": 2, "pBGvAp": 4 }], 4: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      // shim for using process in browser
+    this.width = 4; // I block width (for wall collision)
 
-      var process = module.exports = {};
+    this.numPix = 4; // num pixels in I block
 
-      process.nextTick = function () {
-        var canSetImmediate = typeof window !== 'undefined' && window.setImmediate;
-        var canPost = typeof window !== 'undefined' && window.postMessage && window.addEventListener;
+    this.curRotation = 0; // current pos in rotations array
 
-        if (canSetImmediate) {
-          return function (f) {
-            return window.setImmediate(f);
-          };
+    this.emoji = "🚀";
+    this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 3, y]];
+
+    this.rotate = function () {
+      // gets current x & y
+      let x = this.coords[0][0];
+      let y = this.coords[0][1]; // if I is vert, checks for collisions
+
+      if (this.curRotation === 0 && y < 2 || this.curRotation === 1 && x < 2) {
+        return;
+      }
+
+      if (x >= 0 && x < 9) {
+        // advances curRotation (always 0 or 1)
+        this.curRotation = (this.curRotation + 1) % 2; // rotates to new curRotation
+
+        switch (this.curRotation) {
+          /* vert I block */
+          case 0:
+            this.coords = [[x - 2, y + 2], [x - 1, y + 2], [x, y + 2], [x + 1, y + 2]];
+            break;
+
+          /* horiz I block */
+
+          case 1:
+            this.coords = [[x + 2, y - 2], [x + 2, y - 1], [x + 2, y], [x + 2, y + 1]];
+            break;
         }
-
-        if (canPost) {
-          var queue = [];
-          window.addEventListener('message', function (ev) {
-            var source = ev.source;
-            if ((source === window || source === null) && ev.data === 'process-tick') {
-              ev.stopPropagation();
-              if (queue.length > 0) {
-                var fn = queue.shift();
-                fn();
-              }
-            }
-          }, true);
-
-          return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('process-tick', '*');
-          };
-        }
-
-        return function nextTick(fn) {
-          setTimeout(fn, 0);
-        };
-      }();
-
-      process.title = 'browser';
-      process.browser = true;
-      process.env = {};
-      process.argv = [];
-
-      function noop() {}
-
-      process.on = noop;
-      process.addListener = noop;
-      process.once = noop;
-      process.off = noop;
-      process.removeListener = noop;
-      process.removeAllListeners = noop;
-      process.emit = noop;
-
-      process.binding = function (name) {
-        throw new Error('process.binding is not supported');
-      };
-
-      // TODO(shtylman)
-      process.cwd = function () {
-        return '/';
-      };
-      process.chdir = function (dir) {
-        throw new Error('process.chdir is not supported');
-      };
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/../node_modules/process/browser.js", "/../node_modules/process");
-  }, { "buffer": 2, "pBGvAp": 4 }], 5: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      // -------------------------------------------------------------
-      // --------------------- Block Class ---------------------------
-      // -------------------------------------------------------------
-
-      // Blocks have letter name: I, T, J, L & O (http://i.imgur.com/9Z0oJXe.png)
-      // All block movement/collision calculated from block coordiates
-      // Blocks are made of 4 "pixels"
-      // First block "pixel" is top left pixel
-      // Subsequent block coordinates are calculated from first pixel
-      // Rotations based on NES Tetris (http://imgur.com/a/IVRrf)
-
-      // For collision detection, make first coordinate pair in coords
-      // array the block's far left pixel.  Make the last coorinate
-      // coordinate pair the far right pixel.
-
-
-      module.exports = class Block {
-
-        // block constructor (needs block letter & initial coords)
-        constructor(letter, x, y) {
-          this.letter = letter.toUpperCase();
-          this[`_init${this.letter}`](x, y);
-        }
-
-        // init L block (needs its initial coords)
-        _initL(x, y) {
-          this.height = 2; // L block height (for floor/block collision)
-          this.width = 3; // L block width (for wall collision)
-          this.numPix = 4; // num pixels in L block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "😀";
-          this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 2, y]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if L is vert, checks for collisions
-            if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 4;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* down facing L block */
-                case 0:
-                  this.coords = [[x - 1, y + 1], [x, y + 1], [x + 1, y + 1], [x - 1, y + 2]];
-                  break;
-
-                /* left facing L block */
-                case 1:
-                  this.coords = [[x, y - 1], [x + 1, y - 1], [x + 1, y], [x + 1, y + 1]];
-                  break;
-
-                /* up facing L block */
-                case 2:
-                  this.coords = [[x, y + 1], [x + 1, y + 1], [x + 2, y + 1], [x + 2, y]];
-                  break;
-
-                /* right facing L block */
-                case 3:
-                  this.coords = [[x + 1, y - 1], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init J block (needs its initial coords)
-        _initJ(x, y) {
-          this.height = 2; // J block height (for floor/block collision)
-          this.width = 3; // J block width (for wall collision)
-          this.numPix = 4; // num pixels in J block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "💩";
-          this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 2, y + 1]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if J is vert, checks for collisions
-            if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 3 && x < 1) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 4;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* down facing J block */
-                case 0:
-                  this.coords = [[x - 1, y - 1], [x, y - 1], [x + 1, y - 1], [x + 1, y]];
-                  break;
-
-                /* left facing J block */
-                case 1:
-                  this.coords = [[x, y + 1], [x + 1, y + 1], [x + 1, y], [x + 1, y - 1]];
-                  break;
-
-                /* up facing J block */
-                case 2:
-                  this.coords = [[x, y - 2], [x, y - 1], [x + 1, y - 1], [x + 2, y - 1]];
-                  break;
-
-                /* right facing J block */
-                case 3:
-                  this.coords = [[x + 1, y + 2], [x + 1, y + 1], [x + 1, y], [x + 2, y]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init Z block (needs its initial coords)
-        _initZ(x, y) {
-          this.height = 2; // Z block height (for floor/block collision)
-          this.width = 3; // Z block width (for wall collision)
-          this.numPix = 4; // num pixels in Z block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "🐶";
-          this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y + 1]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if Z is vert, checks for collisions
-            if (this.curRotation === 0 && y < 1) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 2;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* down facing Z block */
-                case 0:
-                  this.coords = [[x, y], [x - 1, y], [x, y + 1], [x + 1, y + 1]];
-                  break;
-
-                /* vert Z block */
-                case 1:
-                  this.coords = [[x, y], [x, y + 1], [x + 1, y], [x + 1, y - 1]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init S block (needs its initial coords)
-        _initS(x, y) {
-          this.height = 2; // S block height (for floor/block collision)
-          this.width = 3; // S block width (for wall collision)
-          this.numPix = 4; // num pixels in S block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "🐮";
-          this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y - 1]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if S is vert, checks for collisions
-            if (this.curRotation === 0 && y < 1) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 2;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* down facing S block */
-                case 0:
-                  this.coords = [[x - 1, y + 1], [x, y + 1], [x, y], [x + 1, y]];
-                  break;
-
-                /* vert S block */
-                case 1:
-                  this.coords = [[x + 1, y - 1], [x + 1, y - 2], [x + 2, y - 1], [x + 2, y]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init T block (needs its initial coords)
-        _initT(x, y) {
-          this.height = 2; // T block height (for floor/block collision)
-          this.width = 3; // T block width (for wall collision)
-          this.numPix = 4; // num pixels in T block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "🚔";
-          this.coords = [[x, y], [x + 1, y], [x + 1, y + 1], [x + 2, y]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if T is vert, checks for collisions
-            if (this.curRotation === 0 && y < 1 || this.curRotation === 1 && x > 7 || this.curRotation === 1 && x < 0 || this.curRotation === 3 && x < 1) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 4;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* down facing T block */
-                case 0:
-                  this.coords = [[x - 1, y - 1], [x, y - 1], [x, y], [x + 1, y - 1]];
-                  break;
-
-                /* left facing T block */
-                case 1:
-                  this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 1, y + 1]];
-                  break;
-
-                /* up facing T block */
-                case 2:
-                  this.coords = [[x, y], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
-                  break;
-
-                /* right facing T block */
-                case 3:
-                  this.coords = [[x + 1, y + 1], [x + 1, y], [x + 1, y - 1], [x + 2, y]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init I block (needs its initial coords)
-        _initI(x, y) {
-          this.height = 1; // I block height (for floor/block collision)
-          this.width = 4; // I block width (for wall collision)
-          this.numPix = 4; // num pixels in I block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "🚀";
-          this.coords = [[x, y], [x + 1, y], [x + 2, y], [x + 3, y]];
-          this.rotate = function () {
-
-            // gets current x & y
-            let x = this.coords[0][0];
-            let y = this.coords[0][1];
-
-            // if I is vert, checks for collisions
-            if (this.curRotation === 0 && y < 2 || this.curRotation === 1 && x < 2) {
-              return;
-            }
-
-            if (x >= 0 && x < 9) {
-
-              // advances curRotation (always 0 or 1)
-              this.curRotation = (this.curRotation + 1) % 2;
-
-              // rotates to new curRotation
-              switch (this.curRotation) {
-
-                /* vert I block */
-                case 0:
-                  this.coords = [[x - 2, y + 2], [x - 1, y + 2], [x, y + 2], [x + 1, y + 2]];
-                  break;
-
-                /* horiz I block */
-                case 1:
-                  this.coords = [[x + 2, y - 2], [x + 2, y - 1], [x + 2, y], [x + 2, y + 1]];
-                  break;
-
-              }
-            }
-          };
-        }
-
-        // init I block (needs its initial coords)
-        _initO(x, y) {
-          this.height = 2; // I block height (for floor/block collision)
-          this.width = 2; // I block width (for wall collision)
-          this.numPix = 4; // num pixels in I block
-          this.curRotation = 0; // current pos in rotations array
-          this.emoji = "🍆";
-          this.coords = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
-          this.rotate = function () {
-            // no rotation on O block;
-          };
-        }
-
-      };
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/block.js", "/");
-  }, { "buffer": 2, "pBGvAp": 4 }], 6: [function (require, module, exports) {
-    (function (process, global, Buffer, __argument0, __argument1, __argument2, __argument3, __filename, __dirname) {
-      let block = require("./block.js");
-
-      (function () {
-
-        // init vars
-        const canvas = document.getElementById("canvas"),
-              ctx = canvas.getContext("2d"),
-              canWidth = canvas.width,
-
-
-        /*
-           "Pixel" is unit of height/width, 1/10 width of board.
-          Each block is made of 4 pixels.
-         */
-
-        // frame counter (needed for block entrance timing)
-        // pixel = canWidth / 10.0;
-        pixel = canWidth / 10;
-        let frame = 0,
-            speed = 125,
-
-        // fontStyle = "18px Georgia",
-        fontStyle = "30px Georgia",
-
-        // colorI = '#1abc9c',
-        // colorT = '#e67e22',
-        // colorO = '#3498db',
-        // colorJ = '#e74c3c',
-        // colorL = '#9b59b6',
-        // colorS = '#f1c40f',
-        // colorZ = '#e97066',
-        fallingBlock,
-
-
-        /*
-           2d array of board layout for keeping track
-          of all "landed" blocks.
-          Landed blocks are blocks that have hit
-          the floor or hit other blocks collected at bottom.
-           landed array is all 0's to start, since no
-          blocks have hit the floor.  Every coordinate
-          with a landed block will gets a 1.
-         */
-
-        landed = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
-
-        // init blocks
-
-        // function defs
-        // helper functions - draw boxes & text to correct scale
-        /*function strokeRec(x, y, w, h) {
-          ctx.strokeRect(x * pixel, y * pixel, w * pixel, h * pixel);
-        }*/
-        // function fillText(text, x, y) {
-        //   //console.log(text,x,y);
-        //   //ctx.fillStyle = color;
-        //   ctx.fillStyle = '#1abc9c';
-        //   ctx.font="18px Georgia";
-        //   //ctx.fillText("text", (x + 0.25) * pixel, (y + 0.75) * pixel);
-        //   //ctx.fillText(text, (0 + 0.25) * pixel, (0 + 0.75) * pixel);
-        //   ctx.fillText(text, (x + 0.25) * pixel, (y + 0.75) * pixel);
-        //   //ctx.strokeRect(x * pixel, y * pixel, w * pixel, h * pixel);
-        //   //ctx.strokeRect(0 * pixel, 0 * pixel, 1 * pixel, 1 * pixel);
-        // }
-        // function drawPixel(x, y, color) {
-        //   ctx.fillStyle = color;
-        //   ctx.fillRect(x * pixel, y * pixel, 1 * pixel, 1 * pixel);
-        // }
-        function drawBlock(coords, numPix, emoji) {
-          for (let i = 0; i < numPix; i++) {
-            //ctx.fillStyle = color;
-            //ctx.fillRect(coords[i][0] * pixel, coords[i][1] * pixel, 1 * pixel, 1 * pixel);
-            // drawText(emoji) {
-            //ctx.fillStyle = '#1abc9c';
-            ctx.font = fontStyle;
-            ctx.fillText(emoji, coords[i][0] * pixel, coords[i][1] * pixel);
-            //fillText(emoji, coords[i][0] * pixel, coords[i][1] * pixel);
-
-            //}
+      }
+    };
+  } // init I block (needs its initial coords)
+
+
+  _initO(x, y) {
+    this.height = 2; // I block height (for floor/block collision)
+
+    this.width = 2; // I block width (for wall collision)
+
+    this.numPix = 4; // num pixels in I block
+
+    this.curRotation = 0; // current pos in rotations array
+
+    this.emoji = "📙";
+    this.coords = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+
+    this.rotate = function () {// no rotation on O block;
+    };
+  }
+
+};
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJtb2R1bGUiLCJleHBvcnRzIiwiQmxvY2siLCJjb25zdHJ1Y3RvciIsImxldHRlciIsIngiLCJ5IiwidG9VcHBlckNhc2UiLCJfaW5pdEwiLCJoZWlnaHQiLCJ3aWR0aCIsIm51bVBpeCIsImN1clJvdGF0aW9uIiwiZW1vamkiLCJjb29yZHMiLCJyb3RhdGUiLCJfaW5pdEoiLCJfaW5pdFoiLCJfaW5pdFMiLCJfaW5pdFQiLCJfaW5pdEkiLCJfaW5pdE8iXSwic291cmNlcyI6WyJibG9jay5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyIvLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4vLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0gQmxvY2sgQ2xhc3MgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4vLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG5cbi8vIEJsb2NrcyBoYXZlIGxldHRlciBuYW1lOiBJLCBULCBKLCBMICYgTyAoaHR0cDovL2kuaW1ndXIuY29tLzlaMG9KWGUucG5nKVxuLy8gQWxsIGJsb2NrIG1vdmVtZW50L2NvbGxpc2lvbiBjYWxjdWxhdGVkIGZyb20gYmxvY2sgY29vcmRpYXRlc1xuLy8gQmxvY2tzIGFyZSBtYWRlIG9mIDQgXCJwaXhlbHNcIlxuLy8gRmlyc3QgYmxvY2sgXCJwaXhlbFwiIGlzIHRvcCBsZWZ0IHBpeGVsXG4vLyBTdWJzZXF1ZW50IGJsb2NrIGNvb3JkaW5hdGVzIGFyZSBjYWxjdWxhdGVkIGZyb20gZmlyc3QgcGl4ZWxcbi8vIFJvdGF0aW9ucyBiYXNlZCBvbiBORVMgY29udHJvbHMgKGh0dHA6Ly9pbWd1ci5jb20vYS9JVlJyZilcblxuLy8gRm9yIGNvbGxpc2lvbiBkZXRlY3Rpb24sIG1ha2UgZmlyc3QgY29vcmRpbmF0ZSBwYWlyIGluIGNvb3Jkc1xuLy8gYXJyYXkgdGhlIGJsb2NrJ3MgZmFyIGxlZnQgcGl4ZWwuICBNYWtlIHRoZSBsYXN0IGNvb3JpbmF0ZVxuLy8gY29vcmRpbmF0ZSBwYWlyIHRoZSBmYXIgcmlnaHQgcGl4ZWwuXG5cblxubW9kdWxlLmV4cG9ydHMgPSBjbGFzcyBCbG9jayB7XG5cbiAgLy8gYmxvY2sgY29uc3RydWN0b3IgKG5lZWRzIGJsb2NrIGxldHRlciAmIGluaXRpYWwgY29vcmRzKVxuICBjb25zdHJ1Y3RvcihsZXR0ZXIsIHgsIHkpXG4gIHtcbiAgICB0aGlzLmxldHRlciA9IGxldHRlci50b1VwcGVyQ2FzZSgpO1xuICAgIHRoaXNbYF9pbml0JHt0aGlzLmxldHRlcn1gXSh4LCB5KTtcbiAgfVxuXG5cbiAgICAvLyBpbml0IEwgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgICBfaW5pdEwoeCwgeSlcbiAgICB7XG4gICAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEwgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgICAgdGhpcy53aWR0aCA9IDM7ICAgICAgICAvLyBMIGJsb2NrIHdpZHRoIChmb3Igd2FsbCBjb2xsaXNpb24pXG4gICAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gTCBibG9ja1xuICAgICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICAgIHRoaXMuZW1vamkgPSBcIvCfmIBcIjtcbiAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4LCB5ICsgMSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDIsIHkgXSAgXTtcbiAgICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG5cbiAgICAgICAgLy8gZ2V0cyBjdXJyZW50IHggJiB5XG4gICAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICAgIGxldCB5ID0gdGhpcy5jb29yZHNbMF1bMV07XG5cbiAgICAgICAgLy8gaWYgTCBpcyB2ZXJ0LCBjaGVja3MgZm9yIGNvbGxpc2lvbnNcbiAgICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgICAgfHwgKHRoaXMuY3VyUm90YXRpb24gPT09IDEgJiYgeCA8IDEpXG4gICAgICAgICAgIHx8ICh0aGlzLmN1clJvdGF0aW9uID09PSAxICYmIHggPiA3KVxuICAgICAgICAgICB8fCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgICAgcmV0dXJuO1xuICAgICAgICB9XG5cbiAgICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgICAgdGhpcy5jdXJSb3RhdGlvbiA9ICh0aGlzLmN1clJvdGF0aW9uICsgMSkgJSA0O1xuXG4gICAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgICAvKiBkb3duIGZhY2luZyBMIGJsb2NrICovXG4gICAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAxLCB5ICsgMSBdLCBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxIF0sIFsgeCAtIDEsIHkgKyAyIF0gXTtcbiAgICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAgIC8qIGxlZnQgZmFjaW5nIEwgYmxvY2sgKi9cbiAgICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSAtIDEgXSwgWyB4ICsgMSwgeSAtIDFdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgKyAxIF0gIF07XG4gICAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgICAvKiB1cCBmYWNpbmcgTCBibG9jayAqL1xuICAgICAgICAgICAgY2FzZSAyOlxuICAgICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4LCB5ICsgMSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5ICsgMSBdLCBbIHggKyAyLCB5IF0gIF07XG4gICAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgICAvKiByaWdodCBmYWNpbmcgTCBibG9jayAqL1xuICAgICAgICAgICAgY2FzZSAzOlxuICAgICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMSwgeSAtIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5ICsgMSBdICBdO1xuICAgICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIH1cblxuICAgICAgICB9XG5cbiAgICAgIH07XG4gICAgfVxuXG5cblxuICAvLyBpbml0IEogYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRKKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEogYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gSiBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBKIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5KpXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDIsIHkgXSwgWyB4ICsgMiwgeSArIDEgXSAgXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBKIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgIHx8ICh0aGlzLmN1clJvdGF0aW9uID09PSAxICYmIHggPCAxKVxuICAgICAgICAgfHwgKHRoaXMuY3VyUm90YXRpb24gPT09IDEgJiYgeCA+IDcpXG4gICAgICAgICB8fCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDQ7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIGRvd24gZmFjaW5nIEogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4IC0gMSwgeSAtIDEgXSwgWyB4LCB5IC0gMSBdLCBbIHggKyAxLCB5IC0gMSBdLCBbIHggKyAxLCB5IF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogbGVmdCBmYWNpbmcgSiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdICBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiB1cCBmYWNpbmcgSiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMjpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgLSAyIF0sIFsgeCwgeSAtIDEgXSwgWyB4ICsgMSwgeSAtIDEgXSwgWyB4ICsgMiwgeSAtIDEgXSAgXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogcmlnaHQgZmFjaW5nIEogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDM6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMSwgeSArIDIgXSwgWyB4ICsgMSwgeSArIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAyLCB5IF0gIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IFogYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRaKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIFogYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gWiBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBaIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5C2XCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgKyAxIF0sIFsgeCArIDIsIHkgKyAxIF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBaIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKHRoaXMuY3VyUm90YXRpb24gPT09IDAgJiYgeSA8IDEpIHtcbiAgICAgICAgcmV0dXJuO1xuICAgICAgfVxuXG4gICAgICBpZiAoICh4ID49IDApICYmICh4IDwgOSkgKSB7XG5cbiAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgIHRoaXMuY3VyUm90YXRpb24gPSAodGhpcy5jdXJSb3RhdGlvbiArIDEpICUgMjtcblxuICAgICAgICAvLyByb3RhdGVzIHRvIG5ldyBjdXJSb3RhdGlvblxuICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgLyogZG93biBmYWNpbmcgWiBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4IC0gMSwgeSBdLCBbIHgsIHkgKyAxIF0sIFsgeCArIDEsIHkgKyAxXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiB2ZXJ0IFogYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDE6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4LCB5IF0sIFsgeCwgeSArIDEgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IFMgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRTKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIFMgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAzOyAgICAgICAgLy8gUyBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBTIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5CuXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgLSAxIF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBTIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKHRoaXMuY3VyUm90YXRpb24gPT09IDAgJiYgeSA8IDEpIHtcbiAgICAgICAgcmV0dXJuO1xuICAgICAgfVxuXG4gICAgICBpZiAoICh4ID49IDApICYmICh4IDwgOSkgKSB7XG5cbiAgICAgICAgLy8gYWR2YW5jZXMgY3VyUm90YXRpb24gKGFsd2F5cyAwIG9yIDEpXG4gICAgICAgIHRoaXMuY3VyUm90YXRpb24gPSAodGhpcy5jdXJSb3RhdGlvbiArIDEpICUgMjtcblxuICAgICAgICAvLyByb3RhdGVzIHRvIG5ldyBjdXJSb3RhdGlvblxuICAgICAgICBzd2l0Y2godGhpcy5jdXJSb3RhdGlvbikge1xuXG4gICAgICAgICAgLyogZG93biBmYWNpbmcgUyBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAxLCB5ICsgMSBdLCBbIHgsIHkgKyAxIF0sIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogdmVydCBTIGJsb2NrICovXG4gICAgICAgICAgY2FzZSAxOlxuICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDEsIHkgLSAyIF0sIFsgeCArIDIsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgfVxuXG4gICAgICB9XG5cbiAgICB9O1xuICB9XG5cbiAgLy8gaW5pdCBUIGJsb2NrIChuZWVkcyBpdHMgaW5pdGlhbCBjb29yZHMpXG4gIF9pbml0VCh4LCB5KVxuICB7XG4gICAgdGhpcy5oZWlnaHQgPSAyOyAgICAgICAvLyBUIGJsb2NrIGhlaWdodCAoZm9yIGZsb29yL2Jsb2NrIGNvbGxpc2lvbilcbiAgICB0aGlzLndpZHRoID0gMzsgICAgICAgIC8vIFQgYmxvY2sgd2lkdGggKGZvciB3YWxsIGNvbGxpc2lvbilcbiAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gVCBibG9ja1xuICAgIHRoaXMuY3VyUm90YXRpb24gPSAwOyAgLy8gY3VycmVudCBwb3MgaW4gcm90YXRpb25zIGFycmF5XG4gICAgdGhpcy5lbW9qaSA9IFwi8J+alFwiO1xuICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAyLCB5IF0gXTtcbiAgICB0aGlzLnJvdGF0ZSA9IGZ1bmN0aW9uKCkge1xuXG4gICAgICAvLyBnZXRzIGN1cnJlbnQgeCAmIHlcbiAgICAgIGxldCB4ID0gdGhpcy5jb29yZHNbMF1bMF07XG4gICAgICBsZXQgeSA9IHRoaXMuY29vcmRzWzBdWzFdO1xuXG4gICAgICAvLyBpZiBUIGlzIHZlcnQsIGNoZWNrcyBmb3IgY29sbGlzaW9uc1xuICAgICAgaWYgKCAodGhpcy5jdXJSb3RhdGlvbiA9PT0gMCAmJiB5IDwgMSlcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMSAmJiB4ID4gNylcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMSAmJiB4IDwgMClcbiAgICAgICAgIHx8ICggdGhpcy5jdXJSb3RhdGlvbiA9PT0gMyAmJiB4IDwgMSkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDQ7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIGRvd24gZmFjaW5nIFQgYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDA6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4IC0gMSwgeSAtIDEgXSwgWyB4ICwgeSAtIDEgXSwgWyB4LCB5IF0sIFsgeCArIDEsIHkgLSAxIF0gXTtcbiAgICAgICAgICAgIGJyZWFrO1xuXG4gICAgICAgICAgLyogbGVmdCBmYWNpbmcgVCBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMTpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAxLCB5IC0gMSBdLCBbIHggKyAxLCB5ICsgMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIC8qIHVwIGZhY2luZyBUIGJsb2NrICovXG4gICAgICAgICAgY2FzZSAyOlxuICAgICAgICAgICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgICAvKiByaWdodCBmYWNpbmcgVCBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMzpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggKyAxLCB5ICsgMSBdLCBbIHggKyAxLCB5IF0sIFsgeCArIDEsIHkgLSAxIF0sIFsgeCArIDIsIHkgXSBdO1xuICAgICAgICAgICAgYnJlYWs7XG5cbiAgICAgICAgfVxuXG4gICAgICB9XG5cbiAgICB9O1xuICB9XG5cbiAgLy8gaW5pdCBJIGJsb2NrIChuZWVkcyBpdHMgaW5pdGlhbCBjb29yZHMpXG4gIF9pbml0SSh4LCB5KVxuICB7XG4gICAgdGhpcy5oZWlnaHQgPSAxOyAgICAgICAvLyBJIGJsb2NrIGhlaWdodCAoZm9yIGZsb29yL2Jsb2NrIGNvbGxpc2lvbilcbiAgICB0aGlzLndpZHRoID0gNDsgICAgICAgIC8vIEkgYmxvY2sgd2lkdGggKGZvciB3YWxsIGNvbGxpc2lvbilcbiAgICB0aGlzLm51bVBpeCA9IDQ7ICAgICAgIC8vIG51bSBwaXhlbHMgaW4gSSBibG9ja1xuICAgIHRoaXMuY3VyUm90YXRpb24gPSAwOyAgLy8gY3VycmVudCBwb3MgaW4gcm90YXRpb25zIGFycmF5XG4gICAgdGhpcy5lbW9qaSA9IFwi8J+agFwiO1xuICAgIHRoaXMuY29vcmRzID0gWyBbIHgsIHkgXSwgWyB4ICsgMSwgeSBdLCBbIHggKyAyLCB5IF0sIFsgeCArIDMsIHkgXSBdO1xuICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG5cbiAgICAgIC8vIGdldHMgY3VycmVudCB4ICYgeVxuICAgICAgbGV0IHggPSB0aGlzLmNvb3Jkc1swXVswXTtcbiAgICAgIGxldCB5ID0gdGhpcy5jb29yZHNbMF1bMV07XG5cbiAgICAgIC8vIGlmIEkgaXMgdmVydCwgY2hlY2tzIGZvciBjb2xsaXNpb25zXG4gICAgICBpZiAoICggKCB0aGlzLmN1clJvdGF0aW9uID09PSAwICkgJiYgKHkgPCAyKSApXG4gICAgICAgICB8fCAoICh0aGlzLmN1clJvdGF0aW9uID09PSAxICkgJiYgKCB4IDwgMiApICkgKSB7XG4gICAgICAgIHJldHVybjtcbiAgICAgIH1cblxuICAgICAgaWYgKCAoeCA+PSAwKSAmJiAoeCA8IDkpICkge1xuXG4gICAgICAgIC8vIGFkdmFuY2VzIGN1clJvdGF0aW9uIChhbHdheXMgMCBvciAxKVxuICAgICAgICB0aGlzLmN1clJvdGF0aW9uID0gKHRoaXMuY3VyUm90YXRpb24gKyAxKSAlIDI7XG5cbiAgICAgICAgLy8gcm90YXRlcyB0byBuZXcgY3VyUm90YXRpb25cbiAgICAgICAgc3dpdGNoKHRoaXMuY3VyUm90YXRpb24pIHtcblxuICAgICAgICAgIC8qIHZlcnQgSSBibG9jayAqL1xuICAgICAgICAgIGNhc2UgMDpcbiAgICAgICAgICAgIHRoaXMuY29vcmRzID0gWyBbIHggLSAyICwgeSArIDIgXSwgWyB4IC0gMSAsIHkgKyAyIF0sIFsgeCAsIHkgKyAyIF0sIFsgeCArIDEgLCB5ICsgMiBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICAgIC8qIGhvcml6IEkgYmxvY2sgKi9cbiAgICAgICAgICBjYXNlIDE6XG4gICAgICAgICAgICB0aGlzLmNvb3JkcyA9IFsgWyB4ICsgMiwgeSAtIDIgXSwgWyB4ICsgMiwgeSAtIDEgXSwgWyB4ICsgMiwgeSBdLCBbIHggKyAyLCB5ICsgMSBdIF07XG4gICAgICAgICAgICBicmVhaztcblxuICAgICAgICB9XG5cbiAgICAgIH1cblxuICAgIH07XG4gIH1cblxuICAvLyBpbml0IEkgYmxvY2sgKG5lZWRzIGl0cyBpbml0aWFsIGNvb3JkcylcbiAgX2luaXRPKHgsIHkpXG4gIHtcbiAgICB0aGlzLmhlaWdodCA9IDI7ICAgICAgIC8vIEkgYmxvY2sgaGVpZ2h0IChmb3IgZmxvb3IvYmxvY2sgY29sbGlzaW9uKVxuICAgIHRoaXMud2lkdGggPSAyOyAgICAgICAgLy8gSSBibG9jayB3aWR0aCAoZm9yIHdhbGwgY29sbGlzaW9uKVxuICAgIHRoaXMubnVtUGl4ID0gNDsgICAgICAgLy8gbnVtIHBpeGVscyBpbiBJIGJsb2NrXG4gICAgdGhpcy5jdXJSb3RhdGlvbiA9IDA7ICAvLyBjdXJyZW50IHBvcyBpbiByb3RhdGlvbnMgYXJyYXlcbiAgICB0aGlzLmVtb2ppID0gXCLwn5OZXCI7XG4gICAgdGhpcy5jb29yZHMgPSBbIFsgeCwgeSBdLCBbIHggKyAxLCB5IF0sIFsgeCwgeSArIDEgXSwgWyB4ICsgMSwgeSArIDEgXSBdO1xuICAgIHRoaXMucm90YXRlID0gZnVuY3Rpb24oKSB7XG4gICAgICAvLyBubyByb3RhdGlvbiBvbiBPIGJsb2NrO1xuICAgIH07XG4gIH1cblxufTtcbiJdLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBO0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBRUE7QUFDQTtBQUNBO0FBR0FBLE1BQU0sQ0FBQ0MsT0FBUCxHQUFpQixNQUFNQyxLQUFOLENBQVk7RUFFM0I7RUFDQUMsV0FBVyxDQUFDQyxNQUFELEVBQVNDLENBQVQsRUFBWUMsQ0FBWixFQUNYO0lBQ0UsS0FBS0YsTUFBTCxHQUFjQSxNQUFNLENBQUNHLFdBQVAsRUFBZDtJQUNBLEtBQU0sUUFBTyxLQUFLSCxNQUFPLEVBQXpCLEVBQTRCQyxDQUE1QixFQUErQkMsQ0FBL0I7RUFDRCxDQVAwQixDQVV6Qjs7O0VBQ0FFLE1BQU0sQ0FBQ0gsQ0FBRCxFQUFJQyxDQUFKLEVBQ047SUFDRSxLQUFLRyxNQUFMLEdBQWMsQ0FBZCxDQURGLENBQ3lCOztJQUN2QixLQUFLQyxLQUFMLEdBQWEsQ0FBYixDQUZGLENBRXlCOztJQUN2QixLQUFLQyxNQUFMLEdBQWMsQ0FBZCxDQUhGLENBR3lCOztJQUN2QixLQUFLQyxXQUFMLEdBQW1CLENBQW5CLENBSkYsQ0FJeUI7O0lBQ3ZCLEtBQUtDLEtBQUwsR0FBYSxJQUFiO0lBQ0EsS0FBS0MsTUFBTCxHQUFjLENBQUUsQ0FBRVQsQ0FBRixFQUFLQyxDQUFMLENBQUYsRUFBWSxDQUFFRCxDQUFGLEVBQUtDLENBQUMsR0FBRyxDQUFULENBQVosRUFBMEIsQ0FBRUQsQ0FBQyxHQUFHLENBQU4sRUFB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
+},{}],3:[function(require,module,exports){
+let block = require("./block.js");
+
+(function () {
+  // init vars
+  const canvas = document.getElementById("canvas"),
+        ctx = canvas.getContext("2d"),
+        canWidth = canvas.width,
+
+  /*
+     "Pixel" is unit of height/width, 1/10 width of board.
+    Each block is made of 4 pixels.
+   */
+  // frame counter (needed for block entrance timing)
+  // pixel = canWidth / 10.0;
+  pixel = canWidth / 10;
+  let frame = 0,
+      speed = 125,
+      // fontStyle = "18px Georgia",
+  fontStyle = "30px Georgia",
+      // colorI = '#1abc9c',
+  // colorT = '#e67e22',
+  // colorO = '#3498db',
+  // colorJ = '#e74c3c',
+  // colorL = '#9b59b6',
+  // colorS = '#f1c40f',
+  // colorZ = '#e97066',
+  fallingBlock,
+
+  /*
+     2d array of board layout for keeping track
+    of all "landed" blocks.
+    Landed blocks are blocks that have hit
+    the floor or hit other blocks collected at bottom.
+     landed array is all 0's to start, since no
+    blocks have hit the floor.  Every coordinate
+    with a landed block will have that
+    block's letter.
+   */
+  landed = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]; // init blocks
+  // function defs
+  // helper functions - draw boxes & text to correct scale
+
+  /*function strokeRec(x, y, w, h) {
+    ctx.strokeRect(x * pixel, y * pixel, w * pixel, h * pixel);
+  }*/
+  // function fillText(text, x, y) {
+  //   //console.log(text,x,y);
+  //   //ctx.fillStyle = color;
+  //   ctx.fillStyle = '#1abc9c';
+  //   ctx.font="18px Georgia";
+  //   //ctx.fillText("text", (x + 0.25) * pixel, (y + 0.75) * pixel);
+  //   //ctx.fillText(text, (0 + 0.25) * pixel, (0 + 0.75) * pixel);
+  //   ctx.fillText(text, (x + 0.25) * pixel, (y + 0.75) * pixel);
+  //   //ctx.strokeRect(x * pixel, y * pixel, w * pixel, h * pixel);
+  //   //ctx.strokeRect(0 * pixel, 0 * pixel, 1 * pixel, 1 * pixel);
+  // }
+  // function drawPixel(x, y, color) {
+  //   ctx.fillStyle = color;
+  //   ctx.fillRect(x * pixel, y * pixel, 1 * pixel, 1 * pixel);
+  // }
+
+  function drawBlock(coords, numPix, emoji) {
+    for (let i = 0; i < numPix; i++) {
+      //ctx.fillStyle = color;
+      //ctx.fillRect(coords[i][0] * pixel, coords[i][1] * pixel, 1 * pixel, 1 * pixel);
+      // drawText(emoji) {
+      //ctx.fillStyle = '#1abc9c';
+      ctx.font = fontStyle;
+      ctx.fillText(emoji, coords[i][0] * pixel, coords[i][1] * pixel); //fillText(emoji, coords[i][0] * pixel, coords[i][1] * pixel);
+      //}
+    }
+  } // add a numbered grid to board.  for debugging
+
+  /*function makeGrid() {
+    for (let i=0; i<10; i++) {
+      strokeRec(i, 0, 1, 20);
+    }
+    for (let i=0; i<20; i++) {
+      strokeRec(0, i, 10, 1);
+    }
+    for (let i=0; i<20; i++) {
+      fillText(i, 0, i);
+    }
+    for (let i=1; i<10; i++) {
+      fillText(i, i, 0);
+    }
+  }
+  */
+  // can copy emoji from http://unicode.org/emoji/charts/full-emoji-list.html#1f600
+  // function drawText() {
+  //     fillText("😀", 0, 0);
+  // }
+
+
+  function checkFullRows() {
+    // check for any full rows
+    for (let i = 0; i < 20; i++) {
+      // goes down far left pixel from top of board to bottom
+      // if far left pixel is a landed block, then it checks
+      // that whole row to see if it's a full row ready to clear
+      if (landed[i][0] !== 0) {
+        let fullRow = true;
+
+        for (let j = 1; j < 10; j++) {
+          if (landed[i][j] === 0) {
+            fullRow = false;
           }
         }
 
-        // add a numbered grid to board.  for debugging
-        /*function makeGrid() {
-          for (let i=0; i<10; i++) {
-            strokeRec(i, 0, 1, 20);
+        if (fullRow) {
+          // clear the found full row
+          for (let j = 0; j < 10; j++) {
+            landed[i][j] = 0;
           }
-          for (let i=0; i<20; i++) {
-            strokeRec(0, i, 10, 1);
-          }
-          for (let i=0; i<20; i++) {
-            fillText(i, 0, i);
-          }
-          for (let i=1; i<10; i++) {
-            fillText(i, i, 0);
-          }
-        }
-        */
+          /*
+             not positive, but i think there's an
+            intermittant bug here leaving certain
+            pixels floating and not dropping when
+            they should be dropped down one
+           */
 
-        // can copy emoji from http://unicode.org/emoji/charts/full-emoji-list.html#1f600
-        // function drawText() {
-        //     fillText("😀", 0, 0);
-        // }
 
-        function checkFullRows() {
-          // check for any full rows
-          for (let i = 0; i < 20; i++) {
-            // goes down far left pixel from top of board to bottom
-            // if far left pixel is a landed block, then it checks
-            // that whole row to see if it's a full row ready to clear
-            if (landed[i][0] !== 0) {
-              let fullRow = true;
-              for (let j = 1; j < 10; j++) {
-                if (landed[i][j] === 0) {
-                  fullRow = false;
-                }
-              }
-              if (fullRow) {
-                // clear the found full row
-                for (let j = 0; j < 10; j++) {
-                  landed[i][j] = 0;
-                }
-
-                /*
-                   not positive, but i think there's an
-                  intermittant bug here leaving certain
-                  pixels floating and not dropping when
-                  they should be dropped down one
-                 */
-                for (let k = i - 1; k >= 0; k--) {
-                  for (let l = 0; l < 10; l++) {
-                    if (landed[k][l] !== 0) {
-                      landed[k + 1][l] = landed[k][l];
-                      landed[k][l] = 0;
-                    }
-                  }
-                }
+          for (let k = i - 1; k >= 0; k--) {
+            for (let l = 0; l < 10; l++) {
+              if (landed[k][l] !== 0) {
+                landed[k + 1][l] = landed[k][l];
+                landed[k][l] = 0;
               }
             }
           }
         }
+      }
+    }
+  } // move the falling block down
 
-        // move the falling block down
-        function moveDown() {
 
-          if (fallingBlock) {
+  function moveDown() {
+    if (fallingBlock) {
+      // check if block is touching bottom now
+      let touchingFloor = false;
 
-            // check if block is touching bottom now
-            let touchingFloor = false;
-            for (let i = 0; i < fallingBlock.coords.length && touchingFloor === false; i++) {
-              if (fallingBlock['coords'][i][1] === 19) {
-                touchingFloor = true;
-              }
-            }
+      for (let i = 0; i < fallingBlock.coords.length && touchingFloor === false; i++) {
+        if (fallingBlock['coords'][i][1] === 19) {
+          touchingFloor = true;
+        }
+      } // check if touching another block
+      // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
 
-            // check if touching another block
-            // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
-            let collision = false;
-            if (!touchingFloor) {
-              for (let coords of fallingBlock.coords) {
-                const [x, y] = coords;
-                if (landed[y + 1][x] !== 0) {
-                  collision = true;
-                }
-              }
-            }
 
-            // if at floor or , add block's pixels to landed array
-            if (touchingFloor || collision) {
-              for (let coords of fallingBlock.coords) {
-                const [x, y] = coords;
-                if (y === 0) {
-                  return 'boardFull';
-                }
-                landed[y][x] = fallingBlock.letter;
-              }
-              fallingBlock = null;
-              return 'cantMoveDown';
-            } else {
-              // lower the block
-              for (let i = 0; i < fallingBlock.coords.length; i++) {
-                fallingBlock['coords'][i][1]++;
-              }
-            }
+      let collision = false;
+
+      if (!touchingFloor) {
+        for (let coords of fallingBlock.coords) {
+          const [x, y] = coords;
+
+          if (landed[y + 1][x] !== 0) {
+            collision = true;
           }
-          return 'movedDown';
+        }
+      } // if at floor or , add block's pixels to landed array
+
+
+      if (touchingFloor || collision) {
+        for (let coords of fallingBlock.coords) {
+          const [x, y] = coords;
+
+          if (y === 0) {
+            return 'boardFull';
+          }
+
+          landed[y][x] = fallingBlock.letter;
         }
 
-        function moveSide(direction) {
+        fallingBlock = null;
+        return 'cantMoveDown';
+      } else {
+        // lower the block
+        for (let i = 0; i < fallingBlock.coords.length; i++) {
+          fallingBlock['coords'][i][1]++;
+        }
+      }
+    }
 
-          if (direction === 'left') {
-            // if not at left edge, move left
-            let firstPixel = fallingBlock['coords'][0];
-            if (firstPixel[0] > 0) {
+    return 'movedDown';
+  }
 
-              // check if touching another block
-              // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
-              let collision = false;
-              for (let coords of fallingBlock.coords) {
-                const [x, y] = coords;
-                if (x > 0 && y >= 0) {
-                  //console.log(x+','+y+'   '+landed[y]);
-                  if (landed[y][x - 1] !== 0) {
-                    collision = true;
-                  }
-                }
-              }
+  function moveSide(direction) {
+    if (direction === 'left') {
+      // if not at left edge, move left
+      let firstPixel = fallingBlock['coords'][0];
 
-              if (!collision) {
-                for (let i = 0; i < fallingBlock.coords.length; i++) {
-                  fallingBlock['coords'][i][0]--;
-                }
-              }
-            }
-          }
+      if (firstPixel[0] > 0) {
+        // check if touching another block
+        // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
+        let collision = false;
 
-          if (direction === 'right') {
+        for (let coords of fallingBlock.coords) {
+          const [x, y] = coords;
 
-            // TODO: run this check on every pixel in block, not just last
-            // if not at right edge, move right
-            let length = fallingBlock.coords.length;
-            let lastPixel = fallingBlock['coords'][length - 1];
-            if (lastPixel[0] < 9) {
-
-              // check if touching another block
-              // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
-              let collision = false;
-              for (let coords of fallingBlock.coords) {
-                const [x, y] = coords;
-                if (x < 9 && y >= 0) {
-                  if (landed[y][x + 1] !== 0) {
-                    collision = true;
-                  }
-                }
-              }
-
-              if (!collision) {
-                for (let i = 0; i < fallingBlock.coords.length; i++) {
-                  fallingBlock['coords'][i][0]++;
-                }
-              }
+          if (x > 0 && y >= 0) {
+            //console.log(x+','+y+'   '+landed[y]);
+            if (landed[y][x - 1] !== 0) {
+              collision = true;
             }
           }
         }
 
-        // rotate block
-        function rotate() {
-          // todo: add collision detection
-          fallingBlock.rotate();
-        }
-
-        // clear the whole board each frame to redraw all pieces in new pos
-        function clearBoard() {
-          ctx.clearRect(0, 0, 10 * pixel, 20 * pixel);
-        }
-
-        // function getColor(block) {
-        //   let color;
-        //   switch (block) {
-        //     case 'I':
-        //       color = colorI;
-        //       break;
-        //     case 'T':
-        //       color = colorT;
-        //       break;
-        //     case 'O':
-        //       color = colorO;
-        //       break;
-        //     case 'S':
-        //       color = colorS;
-        //       break;
-        //     case 'Z':
-        //       color = colorZ;
-        //       break;
-        //     case 'J':
-        //       color = colorJ;
-        //       break;
-        //     case 'L':
-        //       color = colorL;
-        //       break;
-        //   }
-        //   return color;
-        // }
-
-        function getEmoji(block) {
-          // let color;
-          let emoji;
-          switch (block) {
-            case 'I':
-              // color = colorI;
-              emoji = "🚀";
-              break;
-            case 'T':
-              // color = colorT;
-              emoji = "🚔";
-              break;
-            case 'O':
-              // color = colorO;
-              emoji = "🍆";
-              break;
-            case 'S':
-              // color = colorS;
-              emoji = "🐮";
-              break;
-            case 'Z':
-              // color = colorZ;
-              emoji = "🐶";
-              break;
-            case 'J':
-              // color = colorJ;
-              emoji = "💩";
-              break;
-            case 'L':
-              // color = colorL;
-              emoji = "😀";
-              break;
+        if (!collision) {
+          for (let i = 0; i < fallingBlock.coords.length; i++) {
+            fallingBlock['coords'][i][0]--;
           }
-          // return color;
-          return emoji;
         }
+      }
+    }
 
-        // draw all pieces that have hit the bottom
-        // (this set grows as new pieces hit the bottom)
-        function drawLanded() {
-          for (let i = 0; i < landed.length; i++) {
-            for (let j = 0; j < landed[i].length; j++) {
-              if (landed[i][j] !== 0) {
-                //let color = getColor(landed[i][j]);
-                let emoji = getEmoji(landed[i][j]);
-                //  drawPixel(j,i,color);
-                //ctx.fillStyle = '#1abc9c';
-                ctx.font = fontStyle;
-                ctx.fillText(emoji, j * pixel, i * pixel);
-              }
+    if (direction === 'right') {
+      // TODO: run this check on every pixel in block, not just last
+      // if not at right edge, move right
+      let length = fallingBlock.coords.length;
+      let lastPixel = fallingBlock['coords'][length - 1];
+
+      if (lastPixel[0] < 9) {
+        // check if touching another block
+        // (this approach to collision detection from https://gamedevelopment.tutsplus.com/tutorials/implementing-tetris-collision-detection--gamedev-852 )
+        let collision = false;
+
+        for (let coords of fallingBlock.coords) {
+          const [x, y] = coords;
+
+          if (x < 9 && y >= 0) {
+            if (landed[y][x + 1] !== 0) {
+              collision = true;
             }
           }
         }
 
-        function drawFallingBlock() {
-          if (fallingBlock) {
-            //let color = getColor(fallingBlock.letter);
-            drawBlock(fallingBlock.coords, fallingBlock.numPix, fallingBlock.emoji);
+        if (!collision) {
+          for (let i = 0; i < fallingBlock.coords.length; i++) {
+            fallingBlock['coords'][i][0]++;
           }
         }
+      }
+    }
+  } // rotate block
 
-        // // check if fallen pieces have reached top
-        // // if so clear board
-        // function checkFullBoard() {
-        //   let boardFull = false;
-        //   for (let i=0; i<10; i++) {
-        //     if (landed[0][i] === 1) {
-        //       boardFull = true;
-        //     }
-        //   }
-        //   if (boardFull) {
-        //     for (let i=0; i<10; i++) {
-        //       for (let j=0; j<20; j++) {
-        //         landed[j][i] = 0;
-        //       }
-        //     }
-        //   }
-        // }
 
-        function moveDownOrNewBlock() {
-          //console.log(speed);
-          if (frame % (speed / 5) === 0) {
-            if (!fallingBlock) {
-              spawnBlock();
-            }
-          }
-          if (frame % speed === 0) {
-            if (moveDown() === 'boardFull') {
-              return 'boardFull';
-            }
-          }
-          return 'spawned';
+  function rotate() {
+    // todo: add collision detection
+    fallingBlock.rotate();
+  } // clear the whole board each frame to redraw all pieces in new pos
+
+
+  function clearBoard() {
+    ctx.clearRect(0, 0, 10 * pixel, 20 * pixel);
+  } // function getColor(block) {
+  //   let color;
+  //   switch (block) {
+  //     case 'I':
+  //       color = colorI;
+  //       break;
+  //     case 'T':
+  //       color = colorT;
+  //       break;
+  //     case 'O':
+  //       color = colorO;
+  //       break;
+  //     case 'S':
+  //       color = colorS;
+  //       break;
+  //     case 'Z':
+  //       color = colorZ;
+  //       break;
+  //     case 'J':
+  //       color = colorJ;
+  //       break;
+  //     case 'L':
+  //       color = colorL;
+  //       break;
+  //   }
+  //   return color;
+  // }
+
+
+  function getEmoji(block) {
+    // let color;
+    let emoji;
+
+    switch (block) {
+      case 'I':
+        // color = colorI;
+        emoji = "🚀";
+        break;
+
+      case 'T':
+        // color = colorT;
+        emoji = "🚔";
+        break;
+
+      case 'O':
+        // color = colorO;
+        emoji = "🍆";
+        break;
+
+      case 'S':
+        // color = colorS;
+        emoji = "🐮";
+        break;
+
+      case 'Z':
+        // color = colorZ;
+        emoji = "🐶";
+        break;
+
+      case 'J':
+        // color = colorJ;
+        emoji = "💩";
+        break;
+
+      case 'L':
+        // color = colorL;
+        emoji = "😀";
+        break;
+    } // return color;
+
+
+    return emoji;
+  } // draw all pieces that have hit the bottom
+  // (this set grows as new pieces hit the bottom)
+
+
+  function drawLanded() {
+    for (let i = 0; i < landed.length; i++) {
+      for (let j = 0; j < landed[i].length; j++) {
+        if (landed[i][j] !== 0) {
+          //let color = getColor(landed[i][j]);
+          let emoji = getEmoji(landed[i][j]); //  drawPixel(j,i,color);
+          //ctx.fillStyle = '#1abc9c';
+
+          ctx.font = fontStyle;
+          ctx.fillText(emoji, j * pixel, i * pixel);
         }
+      }
+    }
+  }
 
-        function checkSpeedUp() {
-          //console.log(frame, speed);
-          if (frame % 1000 === 0) {
-            if (speed > 49) {
-              //console.log('a');
-              speed -= 25;
-            }
-            if (speed > 10 && speed < 50) {
-              //console.log('b');
-              speed -= 5;
-            }
-          }
-        }
+  function drawFallingBlock() {
+    if (fallingBlock) {
+      //let color = getColor(fallingBlock.letter);
+      drawBlock(fallingBlock.coords, fallingBlock.numPix, fallingBlock.emoji);
+    }
+  } // // check if fallen pieces have reached top
+  // // if so clear board
+  // function checkFullBoard() {
+  //   let boardFull = false;
+  //   for (let i=0; i<10; i++) {
+  //     if (landed[0][i] === 1) {
+  //       boardFull = true;
+  //     }
+  //   }
+  //   if (boardFull) {
+  //     for (let i=0; i<10; i++) {
+  //       for (let j=0; j<20; j++) {
+  //         landed[j][i] = 0;
+  //       }
+  //     }
+  //   }
+  // }
 
-        // spawns new block at top
-        // (todo: x-pos will be random & will account for block width
-        //        so not over either edge)
-        // this falling var couldn't be seen by the other functions
-        // (scoping issues), so scrapping for now...
-        function spawnBlock() {
 
-          let blockType;
-          let x;
-          const numBlock = Math.floor(Math.random() * 7);
-
-          switch (numBlock) {
-
-            case 0:
-              blockType = 'i';
-              x = Math.floor(Math.random() * (10 - 3));
-              break;
-
-            case 1:
-              blockType = 'o';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-            case 2:
-              blockType = 't';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-            case 3:
-              blockType = 's';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-            case 4:
-              blockType = 'z';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-            case 5:
-              blockType = 'j';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-            case 6:
-              blockType = 'l';
-              x = Math.floor(Math.random() * (10 - 2));
-              break;
-
-          }
-
-          const y = 0;
-          fallingBlock = new block(blockType, x, y);
-        }
-
-        // process all keystrokes
-        function processKeystroke(key) {
-
-          if (!fallingBlock) {
-            return;
-          }
-
-          // move block keyboard input
-          switch (key) {
-
-            case 38:
-              // up arrow
-              rotate();
-              break;
-            case 40:
-              // down arrow
-              moveDown();
-              break;
-            case 39:
-              // right arrow
-              moveSide('right');
-              break;
-            case 37:
-              // left arrow
-              moveSide('left');
-              break;
-          }
-        }
-
-        // function drawOnEvent(e) {
-        //   draw();
-        //   e.preventDefault();
-        // }
-
-        // main draw loop (calls itself recursively at end)
-        function draw() {
-          checkSpeedUp();
-          if (moveDownOrNewBlock() === 'boardFull') {
-            //console.log('boardFull: ' + boardFull);
-            speed = 125;
-            for (let i = 0; i < 10; i++) {
-              for (let j = 0; j < 20; j++) {
-                landed[j][i] = 0;
-              }
-            }
-          }
-          checkFullRows();
-          clearBoard();
-          //makeGrid();
-          //drawText();
-          drawLanded();
-          drawFallingBlock();
-          frame++;
-          requestAnimationFrame(draw);
-        }
-
-        // event listeners
-        // for testing - "next" button below board
-        // (make sure moveDown() in draw() is uncommented)
-        //document.getElementById("next").addEventListener("click", drawOnEvent);
-
-        // event listener for all keystrokes
-        document.onkeydown = function (e) {
-          processKeystroke(e.keyCode);
-        };
-
-        // start game
+  function moveDownOrNewBlock() {
+    //console.log(speed);
+    if (frame % (speed / 5) === 0) {
+      if (!fallingBlock) {
         spawnBlock();
-        draw(); // call main draw loop
+      }
+    }
 
-      })();
-    }).call(this, require("pBGvAp"), typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {}, require("buffer").Buffer, arguments[3], arguments[4], arguments[5], arguments[6], "/fake_160ec0ad.js", "/");
-  }, { "./block.js": 5, "buffer": 2, "pBGvAp": 4 }] }, {}, [6]);
-//# sourceMappingURL=emoji-tetrominos.js.map
+    if (frame % speed === 0) {
+      if (moveDown() === 'boardFull') {
+        return 'boardFull';
+      }
+    }
+
+    return 'spawned';
+  }
+
+  function checkSpeedUp() {
+    //console.log(frame, speed);
+    if (frame % 1000 === 0) {
+      if (speed > 49) {
+        //console.log('a');
+        speed -= 25;
+      }
+
+      if (speed > 10 && speed < 50) {
+        //console.log('b');
+        speed -= 5;
+      }
+    }
+  } // spawns new block at top
+  // (todo: x-pos will be random & will account for block width
+  //        so not over either edge)
+  // this falling var couldn't be seen by the other functions
+  // (scoping issues), so scrapping for now...
+
+
+  function spawnBlock() {
+    let blockType;
+    let x;
+    const numBlock = Math.floor(Math.random() * 7);
+
+    switch (numBlock) {
+      case 0:
+        blockType = 'i';
+        x = Math.floor(Math.random() * (10 - 3));
+        break;
+
+      case 1:
+        blockType = 'o';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+
+      case 2:
+        blockType = 't';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+
+      case 3:
+        blockType = 's';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+
+      case 4:
+        blockType = 'z';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+
+      case 5:
+        blockType = 'j';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+
+      case 6:
+        blockType = 'l';
+        x = Math.floor(Math.random() * (10 - 2));
+        break;
+    }
+
+    const y = 0;
+    fallingBlock = new block(blockType, x, y);
+  } // process all keystrokes
+
+
+  function processKeystroke(key) {
+    if (!fallingBlock) {
+      return;
+    } // move block keyboard input
+
+
+    switch (key) {
+      case 38:
+        // up arrow
+        rotate();
+        break;
+
+      case 40:
+        // down arrow
+        moveDown();
+        break;
+
+      case 39:
+        // right arrow
+        moveSide('right');
+        break;
+
+      case 37:
+        // left arrow
+        moveSide('left');
+        break;
+    }
+  } // function drawOnEvent(e) {
+  //   draw();
+  //   e.preventDefault();
+  // }
+  // main draw loop (calls itself recursively at end)
+
+
+  function draw() {
+    checkSpeedUp();
+
+    if (moveDownOrNewBlock() === 'boardFull') {
+      //console.log('boardFull: ' + boardFull);
+      speed = 125;
+
+      for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 20; j++) {
+          landed[j][i] = 0;
+        }
+      }
+    }
+
+    checkFullRows();
+    clearBoard(); //makeGrid();
+    //drawText();
+
+    drawLanded();
+    drawFallingBlock();
+    frame++;
+    requestAnimationFrame(draw);
+  } // event listeners
+  // for testing - "next" button below board
+  // (make sure moveDown() in draw() is uncommented)
+  //document.getElementById("next").addEventListener("click", drawOnEvent);
+  // event listener for all keystrokes
+
+
+  document.onkeydown = function (e) {
+    processKeystroke(e.keyCode);
+  }; // start game
+
+
+  spawnBlock();
+  draw(); // call main draw loop
+})();
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJibG9jayIsInJlcXVpcmUiLCJjYW52YXMiLCJkb2N1bWVudCIsImdldEVsZW1lbnRCeUlkIiwiY3R4IiwiZ2V0Q29udGV4dCIsImNhbldpZHRoIiwid2lkdGgiLCJwaXhlbCIsImZyYW1lIiwic3BlZWQiLCJmb250U3R5bGUiLCJmYWxsaW5nQmxvY2siLCJsYW5kZWQiLCJkcmF3QmxvY2siLCJjb29yZHMiLCJudW1QaXgiLCJlbW9qaSIsImkiLCJmb250IiwiZmlsbFRleHQiLCJjaGVja0Z1bGxSb3dzIiwiZnVsbFJvdyIsImoiLCJrIiwibCIsIm1vdmVEb3duIiwidG91Y2hpbmdGbG9vciIsImxlbmd0aCIsImNvbGxpc2lvbiIsIngiLCJ5IiwibGV0dGVyIiwibW92ZVNpZGUiLCJkaXJlY3Rpb24iLCJmaXJzdFBpeGVsIiwibGFzdFBpeGVsIiwicm90YXRlIiwiY2xlYXJCb2FyZCIsImNsZWFyUmVjdCIsImdldEVtb2ppIiwiZHJhd0xhbmRlZCIsImRyYXdGYWxsaW5nQmxvY2siLCJtb3ZlRG93bk9yTmV3QmxvY2siLCJzcGF3bkJsb2NrIiwiY2hlY2tTcGVlZFVwIiwiYmxvY2tUeXBlIiwibnVtQmxvY2siLCJNYXRoIiwiZmxvb3IiLCJyYW5kb20iLCJwcm9jZXNzS2V5c3Ryb2tlIiwia2V5IiwiZHJhdyIsInJlcXVlc3RBbmltYXRpb25GcmFtZSIsIm9ua2V5ZG93biIsImUiLCJrZXlDb2RlIl0sInNvdXJjZXMiOlsiZW1vamktdGV0cm9taW5vcy5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyJsZXQgYmxvY2sgPSByZXF1aXJlKFwiLi9ibG9jay5qc1wiKTtcblxuKGZ1bmN0aW9uKCl7XG5cbiAgLy8gaW5pdCB2YXJzXG4gIGNvbnN0IGNhbnZhcyA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiY2FudmFzXCIpLFxuICAgICAgY3R4ID0gY2FudmFzLmdldENvbnRleHQoXCIyZFwiKSxcbiAgICAgIGNhbldpZHRoID0gY2FudmFzLndpZHRoLFxuXG4gICAgICAvKlxuXG4gICAgICAgIFwiUGl4ZWxcIiBpcyB1bml0IG9mIGhlaWdodC93aWR0aCwgMS8xMCB3aWR0aCBvZiBib2FyZC5cbiAgICAgICAgRWFjaCBibG9jayBpcyBtYWRlIG9mIDQgcGl4ZWxzLlxuXG4gICAgICAqL1xuXG4gICAgICAvLyBmcmFtZSBjb3VudGVyIChuZWVkZWQgZm9yIGJsb2NrIGVudHJhbmNlIHRpbWluZylcbiAgICAgIC8vIHBpeGVsID0gY2FuV2lkdGggLyAxMC4wO1xuICAgICAgcGl4ZWwgPSBjYW5XaWR0aCAvIDEwO1xuICBsZXQgZnJhbWUgPSAwLFxuICAgICAgc3BlZWQgPSAxMjUsXG4gICAgICAvLyBmb250U3R5bGUgPSBcIjE4cHggR2VvcmdpYVwiLFxuICAgICAgZm9udFN0eWxlID0gXCIzMHB4IEdlb3JnaWFcIixcbiAgICAgIC8vIGNvbG9ySSA9ICcjMWFiYzljJyxcbiAgICAgIC8vIGNvbG9yVCA9ICcjZTY3ZTIyJyxcbiAgICAgIC8vIGNvbG9yTyA9ICcjMzQ5OGRiJyxcbiAgICAgIC8vIGNvbG9ySiA9ICcjZTc0YzNjJyxcbiAgICAgIC8vIGNvbG9yTCA9ICcjOWI1OWI2JyxcbiAgICAgIC8vIGNvbG9yUyA9ICcjZjFjNDBmJyxcbiAgICAgIC8vIGNvbG9yWiA9ICcjZTk3MDY2JyxcbiAgICAgIGZhbGxpbmdCbG9jayxcblxuICAgICAgLypcblxuICAgICAgICAyZCBhcnJheSBvZiBib2FyZCBsYXlvdXQgZm9yIGtlZXBpbmcgdHJhY2tcbiAgICAgICAgb2YgYWxsIFwibGFuZGVkXCIgYmxvY2tzLlxuICAgICAgICBMYW5kZWQgYmxvY2tzIGFyZSBibG9ja3MgdGhhdCBoYXZlIGhpdFxuICAgICAgICB0aGUgZmxvb3Igb3IgaGl0IG90aGVyIGJsb2NrcyBjb2xsZWN0ZWQgYXQgYm90dG9tLlxuXG4gICAgICAgIGxhbmRlZCBhcnJheSBpcyBhbGwgMCdzIHRvIHN0YXJ0LCBzaW5jZSBub1xuICAgICAgICBibG9ja3MgaGF2ZSBoaXQgdGhlIGZsb29yLiAgRXZlcnkgY29vcmRpbmF0ZVxuICAgICAgICB3aXRoIGEgbGFuZGVkIGJsb2NrIHdpbGwgaGF2ZSB0aGF0XG4gICAgICAgIGJsb2NrJ3MgbGV0dGVyLlxuXG4gICAgICAqL1xuXG4gICAgICBsYW5kZWQgPSBbXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdLFxuICAgICAgICBbMCwwLDAsMCwwLDAsMCwwLDAsMF0sXG4gICAgICAgIFswLDAsMCwwLDAsMCwwLDAsMCwwXSxcbiAgICAgICAgWzAsMCwwLDAsMCwwLDAsMCwwLDBdXG4gICAgICBdO1xuXG4gICAgICAvLyBpbml0IGJsb2Nrc1xuXG4gIC8vIGZ1bmN0aW9uIGRlZnNcbiAgLy8gaGVscGVyIGZ1bmN0aW9ucyAtIGRyYXcgYm94ZXMgJiB0ZXh0IHRvIGNvcnJlY3Qgc2NhbGVcbiAgLypmdW5jdGlvbiBzdHJva2VSZWMoeCwgeSwgdywgaCkge1xuICAgIGN0eC5zdHJva2VSZWN0KHggKiBwaXhlbCwgeSAqIHBpeGVsLCB3ICogcGl4ZWwsIGggKiBwaXhlbCk7XG4gIH0qL1xuICAvLyBmdW5jdGlvbiBmaWxsVGV4dCh0ZXh0LCB4LCB5KSB7XG4gIC8vICAgLy9jb25zb2xlLmxvZyh0ZXh0LHgseSk7XG4gIC8vICAgLy9jdHguZmlsbFN0eWxlID0gY29sb3I7XG4gIC8vICAgY3R4LmZpbGxTdHlsZSA9ICcjMWFiYzljJztcbiAgLy8gICBjdHguZm9udD1cIjE4cHggR2VvcmdpYVwiO1xuICAvLyAgIC8vY3R4LmZpbGxUZXh0KFwidGV4dFwiLCAoeCArIDAuMjUpICogcGl4ZWwsICh5ICsgMC43NSkgKiBwaXhlbCk7XG4gIC8vICAgLy9jdHguZmlsbFRleHQodGV4dCwgKDAgKyAwLjI1KSAqIHBpeGVsLCAoMCArIDAuNzUpICogcGl4ZWwpO1xuICAvLyAgIGN0eC5maWxsVGV4dCh0ZXh0LCAoeCArIDAuMjUpICogcGl4ZWwsICh5ICsgMC43NSkgKiBwaXhlbCk7XG4gIC8vICAgLy9jdHguc3Ryb2tlUmVjdCh4ICogcGl4ZWwsIHkgKiBwaXhlbCwgdyAqIHBpeGVsLCBoICogcGl4ZWwpO1xuICAvLyAgIC8vY3R4LnN0cm9rZVJlY3QoMCAqIHBpeGVsLCAwICogcGl4ZWwsIDEgKiBwaXhlbCwgMSAqIHBpeGVsKTtcbiAgLy8gfVxuICAvLyBmdW5jdGlvbiBkcmF3UGl4ZWwoeCwgeSwgY29sb3IpIHtcbiAgLy8gICBjdHguZmlsbFN0eWxlID0gY29sb3I7XG4gIC8vICAgY3R4LmZpbGxSZWN0KHggKiBwaXhlbCwgeSAqIHBpeGVsLCAxICogcGl4ZWwsIDEgKiBwaXhlbCk7XG4gIC8vIH1cbiAgZnVuY3Rpb24gZHJhd0Jsb2NrKGNvb3JkcywgbnVtUGl4LCBlbW9qaSkge1xuICAgIGZvciAobGV0IGk9MDsgaTxudW1QaXg7IGkrKykge1xuICAgICAgLy9jdHguZmlsbFN0eWxlID0gY29sb3I7XG4gICAgICAvL2N0eC5maWxsUmVjdChjb29yZHNbaV1bMF0gKiBwaXhlbCwgY29vcmRzW2ldWzFdICogcGl4ZWwsIDEgKiBwaXhlbCwgMSAqIHBpeGVsKTtcbiAgICAgIC8vIGRyYXdUZXh0KGVtb2ppKSB7XG4gICAgICAvL2N0eC5maWxsU3R5bGUgPSAnIzFhYmM5Yyc7XG4gICAgICBjdHguZm9udD1mb250U3R5bGU7XG4gICAgICBjdHguZmlsbFRleHQoZW1vamksIChjb29yZHNbaV1bMF0pICogcGl4ZWwsIChjb29yZHNbaV1bMV0pICogcGl4ZWwpO1xuICAgICAgLy9maWxsVGV4dChlbW9qaSwgY29vcmRzW2ldWzBdICogcGl4ZWwsIGNvb3Jkc1tpXVsxXSAqIHBpeGVsKTtcblxuICAgICAgLy99XG4gICAgfVxuICB9XG5cbiAgLy8gYWRkIGEgbnVtYmVyZWQgZ3JpZCB0byBib2FyZC4gIGZvciBkZWJ1Z2dpbmdcbiAgLypmdW5jdGlvbiBtYWtlR3JpZCgpIHtcbiAgICBmb3IgKGxldCBpPTA7IGk8MTA7IGkrKykge1xuICAgICAgc3Ryb2tlUmVjKGksIDAsIDEsIDIwKTtcbiAgICB9XG4gICAgZm9yIChsZXQgaT0wOyBpPDIwOyBpKyspIHtcbiAgICAgIHN0cm9rZVJlYygwLCBpLCAxMCwgMSk7XG4gICAgfVxuICAgIGZvciAobGV0IGk9MDsgaTwyMDsgaSsrKSB7XG4gICAgICBmaWxsVGV4dChpLCAwLCBpKTtcbiAgICB9XG4gICAgZm9yIChsZXQgaT0xOyBpPDEwOyBpKyspIHtcbiAgICAgIGZpbGxUZXh0KGksIGksIDApO1xuICAgIH1cbiAgfVxuICAqL1xuXG4gIC8vIGNhbiBjb3B5IGVtb2ppIGZyb20gaHR0cDovL3VuaWNvZGUub3JnL2Vtb2ppL2NoYXJ0cy9mdWxsLWVtb2ppLWxpc3QuaHRtbCMxZjYwMFxuICAvLyBmdW5jdGlvbiBkcmF3VGV4dCgpIHtcbiAgLy8gICAgIGZpbGxUZXh0KFwi8J+YgFwiLCAwLCAwKTtcbiAgLy8gfVxuXG4gIGZ1bmN0aW9uIGNoZWNrRnVsbFJvd3MoKVxuICB7XG4gICAgLy8gY2hlY2sgZm9yIGFueSBmdWxsIHJvd3NcbiAgICBmb3IgKGxldCBpPTA7IGk8MjA7IGkrKykge1xuICAgICAgLy8gZ29lcyBkb3duIGZhciBsZWZ0IHBpeGVsIGZyb20gdG9wIG9mIGJvYXJkIHRvIGJvdHRvbVxuICAgICAgLy8gaWYgZmFyIGxlZnQgcGl4ZWwgaXMgYSBsYW5kZWQgYmxvY2ssIHRoZW4gaXQgY2hlY2tzXG4gICAgICAvLyB0aGF0IHdob2xlIHJvdyB0byBzZWUgaWYgaXQncyBhIGZ1bGwgcm93IHJlYWR5IHRvIGNsZWFyXG4gICAgICBpZiAobGFuZGVkW2ldWzBdICE9PSAwKSB7XG4gICAgICAgIGxldCBmdWxsUm93ID0gdHJ1ZTtcbiAgICAgICAgZm9yIChsZXQgaj0xOyBqPDEwOyBqKyspIHtcbiAgICAgICAgICBpZiAobGFuZGVkW2ldW2pdID09PSAwKSB7XG4gICAgICAgICAgICBmdWxsUm93ID0gZmFsc2U7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICAgIGlmIChmdWxsUm93KSB7XG4gICAgICAgICAgLy8gY2xlYXIgdGhlIGZvdW5kIGZ1bGwgcm93XG4gICAgICAgICAgZm9yIChsZXQgaj0wOyBqPDEwOyBqKyspIHtcbiAgICAgICAgICAgIGxhbmRlZFtpXVtqXSA9IDA7XG4gICAgICAgICAgfVxuXG4gICAgICAgICAgLypcblxuICAgICAgICAgICAgbm90IHBvc2l0aXZlLCBidXQgaSB0aGluayB0aGVyZSdzIGFuXG4gICAgICAgICAgICBpbnRlcm1pdHRhbnQgYnVnIGhlcmUgbGVhdmluZyBjZXJ0YWluXG4gICAgICAgICAgICBwaXhlbHMgZmxvYXRpbmcgYW5kIG5vdCBkcm9wcGluZyB3aGVuXG4gICAgICAgICAgICB0aGV5IHNob3VsZCBiZSBkcm9wcGVkIGRvd24gb25lXG5cbiAgICAgICAgICAqL1xuICAgICAgICAgIGZvciAobGV0IGs9aS0xOyBrPj0wOyBrLS0pIHtcbiAgICAgICAgICAgIGZvciAobGV0IGw9MDsgbDwxMDsgbCsrKSB7XG4gICAgICAgICAgICAgIGlmIChsYW5kZWRba11bbF0gIT09IDApIHtcbiAgICAgICAgICAgICAgICBsYW5kZWRbaysxXVtsXSA9IGxhbmRlZFtrXVtsXTtcbiAgICAgICAgICAgICAgICBsYW5kZWRba11bbF0gPSAwO1xuICAgICAgICAgICAgICB9XG4gICAgICAgICAgICB9XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG5cbiAgLy8gbW92ZSB0aGUgZmFsbGluZyBibG9jayBkb3duXG4gIGZ1bmN0aW9uIG1vdmVEb3duKCkge1xuXG4gICAgaWYgKGZhbGxpbmdCbG9jaykge1xuXG4gICAgICAvLyBjaGVjayBpZiBibG9jayBpcyB0b3VjaGluZyBib3R0b20gbm93XG4gICAgICBsZXQgdG91Y2hpbmdGbG9vciA9IGZhbHNlO1xuICAgICAgZm9yIChsZXQgaT0wOyBpPGZhbGxpbmdCbG9jay5jb29yZHMubGVuZ3RoICYmIHRvdWNoaW5nRmxvb3I9PT1mYWxzZTsgaSsrKSB7XG4gICAgICAgIGlmIChmYWxsaW5nQmxvY2tbJ2Nvb3JkcyddW2ldWzFdID09PSAxOSkge1xuICAgICAgICAgIHRvdWNoaW5nRmxvb3IgPSB0cnVlO1xuICAgICAgICB9XG4gICAgICB9XG5cbiAgICAgIC8vIGNoZWNrIGlmIHRvdWNoaW5nIGFub3RoZXIgYmxvY2tcbiAgICAgIC8vICh0aGlzIGFwcHJvYWNoIHRvIGNvbGxpc2lvbiBkZXRlY3Rpb24gZnJvbSBodHRwczovL2dhbWVkZXZlbG9wbWVudC50dXRzcGx1cy5jb20vdHV0b3JpYWxzL2ltcGxlbWVudGluZy10ZXRyaXMtY29sbGlzaW9uLWRldGVjdGlvbi0tZ2FtZWRldi04NTIgKVxuICAgICAgbGV0IGNvbGxpc2lvbiA9IGZhbHNlO1xuICAgICAgaWYgKCF0b3VjaGluZ0Zsb29yKSB7XG4gICAgICAgIGZvciAobGV0IGNvb3JkcyBvZiBmYWxsaW5nQmxvY2suY29vcmRzKSB7XG4gICAgICAgICAgY29uc3QgWyB4LCB5IF0gPSBjb29yZHM7XG4gICAgICAgICAgaWYgKGxhbmRlZFsgeSArIDEgXVsgeCBdICE9PSAwKSB7XG4gICAgICAgICAgICBjb2xsaXNpb24gPSB0cnVlO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBpZiBhdCBmbG9vciBvciAsIGFkZCBibG9jaydzIHBpeGVscyB0byBsYW5kZWQgYXJyYXlcbiAgICAgIGlmICh0b3VjaGluZ0Zsb29yIHx8IGNvbGxpc2lvbikge1xuICAgICAgICBmb3IgKGxldCBjb29yZHMgb2YgZmFsbGluZ0Jsb2NrLmNvb3Jkcykge1xuICAgICAgICAgIGNvbnN0IFsgeCwgeSBdID0gY29vcmRzO1xuICAgICAgICAgIGlmICh5ID09PSAwKSB7XG4gICAgICAgICAgICByZXR1cm4gJ2JvYXJkRnVsbCc7XG4gICAgICAgICAgfVxuICAgICAgICAgIGxhbmRlZFt5XVt4XSA9IGZhbGxpbmdCbG9jay5sZXR0ZXI7XG4gICAgICAgIH1cbiAgICAgICAgZmFsbGluZ0Jsb2NrID0gbnVsbDtcbiAgICAgICAgcmV0dXJuICdjYW50TW92ZURvd24nO1xuICAgICAgfSBlbHNlIHtcbiAgICAgICAgLy8gbG93ZXIgdGhlIGJsb2NrXG4gICAgICAgIGZvciAobGV0IGk9MDsgaTxmYWxsaW5nQmxvY2suY29vcmRzLmxlbmd0aDsgaSsrKSB7XG4gICAgICAgICAgZmFsbGluZ0Jsb2NrWydjb29yZHMnXVtpXVsxXSsrO1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICAgIHJldHVybiAnbW92ZWREb3duJztcbiAgfVxuXG4gIGZ1bmN0aW9uIG1vdmVTaWRlKGRpcmVjdGlvbikge1xuXG4gICAgaWYgKGRpcmVjdGlvbiA9PT0gJ2xlZnQnKSB7XG4gICAgICAvLyBpZiBub3QgYXQgbGVmdCBlZGdlLCBtb3ZlIGxlZnRcbiAgICAgIGxldCBmaXJzdFBpeGVsID0gZmFsbGluZ0Jsb2NrWydjb29yZHMnXVswXTtcbiAgICAgIGlmIChmaXJzdFBpeGVsWzBdID4gMCkge1xuXG4gICAgICAgIC8vIGNoZWNrIGlmIHRvdWNoaW5nIGFub3RoZXIgYmxvY2tcbiAgICAgICAgLy8gKHRoaXMgYXBwcm9hY2ggdG8gY29sbGlzaW9uIGRldGVjdGlvbiBmcm9tIGh0dHBzOi8vZ2FtZWRldmVsb3BtZW50LnR1dHNwbHVzLmNvbS90dXRvcmlhbHMvaW1wbGVtZW50aW5nLXRldHJpcy1jb2xsaXNpb24tZGV0ZWN0aW9uLS1nYW1lZGV2LTg1MiApXG4gICAgICAgIGxldCBjb2xsaXNpb24gPSBmYWxzZTtcbiAgICAgICAgZm9yIChsZXQgY29vcmRzIG9mIGZhbGxpbmdCbG9jay5jb29yZHMpIHtcbiAgICAgICAgICBjb25zdCBbIHgsIHkgXSA9IGNvb3JkcztcbiAgICAgICAgICBpZiAoICh4ID4gMCkgJiYgKCB5ID49IDApICkge1xuICAgICAgICAgICAgLy9jb25zb2xlLmxvZyh4KycsJyt5KycgICAnK2xhbmRlZFt5XSk7XG4gICAgICAgICAgICBpZiAobGFuZGVkWyB5IF1bIHggLSAxIF0gIT09IDApIHtcbiAgICAgICAgICAgICAgY29sbGlzaW9uID0gdHJ1ZTtcbiAgICAgICAgICAgIH1cbiAgICAgICAgICB9XG4gICAgICAgIH1cblxuICAgICAgICBpZiAoIWNvbGxpc2lvbikge1xuICAgICAgICAgIGZvciAobGV0IGk9MDsgaTxmYWxsaW5nQmxvY2suY29vcmRzLmxlbmd0aDsgaSsrKSB7XG4gICAgICAgICAgICBmYWxsaW5nQmxvY2tbJ2Nvb3JkcyddW2ldWzBdLS07XG4gICAgICAgICAgfVxuXG4gICAgICAgIH1cblxuICAgICAgfVxuICAgIH1cblxuICAgIGlmIChkaXJlY3Rpb24gPT09ICdyaWdodCcpIHtcblxuICAgICAgLy8gVE9ETzogcnVuIHRoaXMgY2hlY2sgb24gZXZlcnkgcGl4ZWwgaW4gYmxvY2ssIG5vdCBqdXN0IGxhc3RcbiAgICAgIC8vIGlmIG5vdCBhdCByaWdodCBlZGdlLCBtb3ZlIHJpZ2h0XG4gICAgICBsZXQgbGVuZ3RoID0gZmFsbGluZ0Jsb2NrLmNvb3Jkcy5sZW5ndGg7XG4gICAgICBsZXQgbGFzdFBpeGVsID0gZmFsbGluZ0Jsb2NrWydjb29yZHMnXVtsZW5ndGgtMV07XG4gICAgICBpZiAobGFzdFBpeGVsWzBdIDwgOSkge1xuXG4gICAgICAgIC8vIGNoZWNrIGlmIHRvdWNoaW5nIGFub3RoZXIgYmxvY2tcbiAgICAgICAgLy8gKHRoaXMgYXBwcm9hY2ggdG8gY29sbGlzaW9uIGRldGVjdGlvbiBmcm9tIGh0dHBzOi8vZ2FtZWRldmVsb3BtZW50LnR1dHNwbHVzLmNvbS90dXRvcmlhbHMvaW1wbGVtZW50aW5nLXRldHJpcy1jb2xsaXNpb24tZGV0ZWN0aW9uLS1nYW1lZGV2LTg1MiApXG4gICAgICAgIGxldCBjb2xsaXNpb24gPSBmYWxzZTtcbiAgICAgICAgZm9yIChsZXQgY29vcmRzIG9mIGZhbGxpbmdCbG9jay5jb29yZHMpIHtcbiAgICAgICAgICBjb25zdCBbIHgsIHkgXSA9IGNvb3JkcztcbiAgICAgICAgICBpZiAoICh4IDwgOSkgJiYgKHk+PTApICkge1xuICAgICAgICAgICAgaWYgKGxhbmRlZFsgeSBdWyB4ICsgMSBdICE9PSAwKSB7XG4gICAgICAgICAgICAgIGNvbGxpc2lvbiA9IHRydWU7XG4gICAgICAgICAgICB9XG4gICAgICAgICAgfVxuICAgICAgICB9XG5cbiAgICAgICAgaWYgKCFjb2xsaXNpb24pIHtcbiAgICAgICAgICBmb3IgKGxldCBpPTA7IGk8ZmFsbGluZ0Jsb2NrLmNvb3Jkcy5sZW5ndGg7IGkrKykge1xuICAgICAgICAgICAgZmFsbGluZ0Jsb2NrWydjb29yZHMnXVtpXVswXSsrO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuXG4gICAgICB9XG4gICAgfVxuXG4gIH1cblxuICAvLyByb3RhdGUgYmxvY2tcbiAgZnVuY3Rpb24gcm90YXRlKCkge1xuICAgIC8vIHRvZG86IGFkZCBjb2xsaXNpb24gZGV0ZWN0aW9uXG4gICAgZmFsbGluZ0Jsb2NrLnJvdGF0ZSgpO1xuICB9XG5cbiAgLy8gY2xlYXIgdGhlIHdob2xlIGJvYXJkIGVhY2ggZnJhbWUgdG8gcmVkcmF3IGFsbCBwaWVjZXMgaW4gbmV3IHBvc1xuICBmdW5jdGlvbiBjbGVhckJvYXJkKCkge1xuICAgIGN0eC5jbGVhclJlY3QoMCwgMCwgMTAgKiBwaXhlbCwgMjAgKiBwaXhlbCk7XG4gIH1cblxuICAvLyBmdW5jdGlvbiBnZXRDb2xvcihibG9jaykge1xuICAvLyAgIGxldCBjb2xvcjtcbiAgLy8gICBzd2l0Y2ggKGJsb2NrKSB7XG4gIC8vICAgICBjYXNlICdJJzpcbiAgLy8gICAgICAgY29sb3IgPSBjb2xvckk7XG4gIC8vICAgICAgIGJyZWFrO1xuICAvLyAgICAgY2FzZSAnVCc6XG4gIC8vICAgICAgIGNvbG9yID0gY29sb3JUO1xuICAvLyAgICAgICBicmVhaztcbiAgLy8gICAgIGNhc2UgJ08nOlxuICAvLyAgICAgICBjb2xvciA9IGNvbG9yTztcbiAgLy8gICAgICAgYnJlYWs7XG4gIC8vICAgICBjYXNlICdTJzpcbiAgLy8gICAgICAgY29sb3IgPSBjb2xvclM7XG4gIC8vICAgICAgIGJyZWFrO1xuICAvLyAgICAgY2FzZSAnWic6XG4gIC8vICAgICAgIGNvbG9yID0gY29sb3JaO1xuICAvLyAgICAgICBicmVhaztcbiAgLy8gICAgIGNhc2UgJ0onOlxuICAvLyAgICAgICBjb2xvciA9IGNvbG9ySjtcbiAgLy8gICAgICAgYnJlYWs7XG4gIC8vICAgICBjYXNlICdMJzpcbiAgLy8gICAgICAgY29sb3IgPSBjb2xvckw7XG4gIC8vICAgICAgIGJyZWFrO1xuICAvLyAgIH1cbiAgLy8gICByZXR1cm4gY29sb3I7XG4gIC8vIH1cblxuICBmdW5jdGlvbiBnZXRFbW9qaShibG9jaykge1xuICAgIC8vIGxldCBjb2xvcjtcbiAgICBsZXQgZW1vamk7XG4gICAgc3dpdGNoIChibG9jaykge1xuICAgICAgY2FzZSAnSSc6XG4gICAgICAgIC8vIGNvbG9yID0gY29sb3JJO1xuICAgICAgICBlbW9qaSA9IFwi8J+agFwiO1xuICAgICAgICBicmVhaztcbiAgICAgIGNhc2UgJ1QnOlxuICAgICAgICAvLyBjb2xvciA9IGNvbG9yVDtcbiAgICAgICAgZW1vamkgPSBcIvCfmpRcIjtcbiAgICAgICAgYnJlYWs7XG4gICAgICBjYXNlICdPJzpcbiAgICAgICAgLy8gY29sb3IgPSBjb2xvck87XG4gICAgICAgIGVtb2ppID0gXCLwn42GXCI7XG4gICAgICAgIGJyZWFrO1xuICAgICAgY2FzZSAnUyc6XG4gICAgICAgIC8vIGNvbG9yID0gY29sb3JTO1xuICAgICAgICBlbW9qaSA9IFwi8J+QrlwiO1xuICAgICAgICBicmVhaztcbiAgICAgIGNhc2UgJ1onOlxuICAgICAgICAvLyBjb2xvciA9IGNvbG9yWjtcbiAgICAgICAgZW1vamkgPSBcIvCfkLZcIjtcbiAgICAgICAgYnJlYWs7XG4gICAgICBjYXNlICdKJzpcbiAgICAgICAgLy8gY29sb3IgPSBjb2xvcko7XG4gICAgICAgIGVtb2ppID0gXCLwn5KpXCI7XG4gICAgICAgIGJyZWFrO1xuICAgICAgY2FzZSAnTCc6XG4gICAgICAgIC8vIGNvbG9yID0gY29sb3JMO1xuICAgICAgICBlbW9qaSA9IFwi8J+YgFwiO1xuICAgICAgICBicmVhaztcbiAgICB9XG4gICAgLy8gcmV0dXJuIGNvbG9yO1xuICAgIHJldHVybiBlbW9qaTtcbiAgfVxuXG4gIC8vIGRyYXcgYWxsIHBpZWNlcyB0aGF0IGhhdmUgaGl0IHRoZSBib3R0b21cbiAgLy8gKHRoaXMgc2V0IGdyb3dzIGFzIG5ldyBwaWVjZXMgaGl0IHRoZSBib3R0b20pXG4gIGZ1bmN0aW9uIGRyYXdMYW5kZWQoKSB7XG4gICAgZm9yIChsZXQgaT0wOyBpPGxhbmRlZC5sZW5ndGg7IGkrKykge1xuICAgICAgZm9yIChsZXQgaj0wOyBqPGxhbmRlZFtpXS5sZW5ndGg7IGorKykge1xuICAgICAgICBpZiAobGFuZGVkW2ldW2pdICE9PSAwKSB7XG4gICAgICAgICAgLy9sZXQgY29sb3IgPSBnZXRDb2xvcihsYW5kZWRbaV1bal0pO1xuICAgICAgICAgIGxldCBlbW9qaSA9IGdldEVtb2ppKGxhbmRlZFtpXVtqXSk7XG4gICAgICAgIC8vICBkcmF3UGl4ZWwoaixpLGNvbG9yKTtcbiAgICAgICAgLy9jdHguZmlsbFN0eWxlID0gJyMxYWJjOWMnO1xuICAgICAgICBjdHguZm9udD1mb250U3R5bGU7XG4gICAgICAgIGN0eC5maWxsVGV4dChlbW9qaSwgaiAqIHBpeGVsLCBpICogcGl4ZWwpO1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG5cbiAgZnVuY3Rpb24gZHJhd0ZhbGxpbmdCbG9jaygpIHtcbiAgICBpZiAoZmFsbGluZ0Jsb2NrKSB7XG4gICAgICAvL2xldCBjb2xvciA9IGdldENvbG9yKGZhbGxpbmdCbG9jay5sZXR0ZXIpO1xuICAgICAgZHJhd0Jsb2NrKFxuICAgICAgICBmYWxsaW5nQmxvY2suY29vcmRzLFxuICAgICAgICBmYWxsaW5nQmxvY2subnVtUGl4LFxuICAgICAgICBmYWxsaW5nQmxvY2suZW1vamlcbiAgICAgICk7XG4gICAgfVxuICB9XG5cbiAgLy8gLy8gY2hlY2sgaWYgZmFsbGVuIHBpZWNlcyBoYXZlIHJlYWNoZWQgdG9wXG4gIC8vIC8vIGlmIHNvIGNsZWFyIGJvYXJkXG4gIC8vIGZ1bmN0aW9uIGNoZWNrRnVsbEJvYXJkKCkge1xuICAvLyAgIGxldCBib2FyZEZ1bGwgPSBmYWxzZTtcbiAgLy8gICBmb3IgKGxldCBpPTA7IGk8MTA7IGkrKykge1xuICAvLyAgICAgaWYgKGxhbmRlZFswXVtpXSA9PT0gMSkge1xuICAvLyAgICAgICBib2FyZEZ1bGwgPSB0cnVlO1xuICAvLyAgICAgfVxuICAvLyAgIH1cbiAgLy8gICBpZiAoYm9hcmRGdWxsKSB7XG4gIC8vICAgICBmb3IgKGxldCBpPTA7IGk8MTA7IGkrKykge1xuICAvLyAgICAgICBmb3IgKGxldCBqPTA7IGo8MjA7IGorKykge1xuICAvLyAgICAgICAgIGxhbmRlZFtqXVtpXSA9IDA7XG4gIC8vICAgICAgIH1cbiAgLy8gICAgIH1cbiAgLy8gICB9XG4gIC8vIH1cblxuICBmdW5jdGlvbiBtb3ZlRG93bk9yTmV3QmxvY2soKSB7XG4gICAgLy9jb25zb2xlLmxvZyhzcGVlZCk7XG4gICAgaWYgKGZyYW1lICUgKHNwZWVkIC8gNSkgPT09IDApIHtcbiAgICAgIGlmICghZmFsbGluZ0Jsb2NrKSB7XG4gICAgICAgIHNwYXduQmxvY2soKTtcbiAgICAgIH1cbiAgICB9XG4gICAgaWYgKGZyYW1lICUgc3BlZWQgPT09IDApIHtcbiAgICAgIGlmIChtb3ZlRG93bigpID09PSAnYm9hcmRGdWxsJykge1xuICAgICAgICByZXR1cm4gJ2JvYXJkRnVsbCc7XG4gICAgICB9XG4gICAgfVxuICAgIHJldHVybiAnc3Bhd25lZCc7XG4gIH1cblxuICBmdW5jdGlvbiBjaGVja1NwZWVkVXAoKSB7XG4gICAgLy9jb25zb2xlLmxvZyhmcmFtZSwgc3BlZWQpO1xuICAgIGlmIChmcmFtZSAlIDEwMDAgPT09IDApIHtcbiAgICAgIGlmIChzcGVlZCA+IDQ5KSB7XG4gICAgICAgIC8vY29uc29sZS5sb2coJ2EnKTtcbiAgICAgICAgc3BlZWQgLT0gMjU7XG4gICAgICB9XG4gICAgICBpZiAoc3BlZWQgPiAxMCAmJiBzcGVlZCA8IDUwKSB7XG4gICAgICAgIC8vY29uc29sZS5sb2coJ2InKTtcbiAgICAgICAgc3BlZWQgLT0gNTtcbiAgICAgIH1cbiAgICB9XG4gIH1cblxuICAvLyBzcGF3bnMgbmV3IGJsb2NrIGF0IHRvcFxuICAvLyAodG9kbzogeC1wb3Mgd2lsbCBiZSByYW5kb20gJiB3aWxsIGFjY291bnQgZm9yIGJsb2NrIHdpZHRoXG4gIC8vICAgICAgICBzbyBub3Qgb3ZlciBlaXRoZXIgZWRnZSlcbiAgLy8gdGhpcyBmYWxsaW5nIHZhciBjb3VsZG4ndCBiZSBzZWVuIGJ5IHRoZSBvdGhlciBmdW5jdGlvbnNcbiAgLy8gKHNjb3BpbmcgaXNzdWVzKSwgc28gc2NyYXBwaW5nIGZvciBub3cuLi5cbiAgZnVuY3Rpb24gc3Bhd25CbG9jaygpIHtcblxuICAgIGxldCBibG9ja1R5cGU7XG4gICAgbGV0IHg7XG4gICAgY29uc3QgbnVtQmxvY2sgPSBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiA3KTtcblxuICAgIHN3aXRjaCAobnVtQmxvY2spIHtcblxuICAgICAgY2FzZSAwOlxuICAgICAgICBibG9ja1R5cGUgPSAnaSc7XG4gICAgICAgIHggPSBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiAoMTAgLSAzKSk7XG4gICAgICAgIGJyZWFrO1xuXG4gICAgICBjYXNlIDE6XG4gICAgICAgIGJsb2NrVHlwZSA9ICdvJztcbiAgICAgICAgeCA9IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSAqICgxMCAtIDIpKTtcbiAgICAgICAgYnJlYWs7XG5cbiAgICAgIGNhc2UgMjpcbiAgICAgICAgYmxvY2tUeXBlID0gJ3QnO1xuICAgICAgICB4ID0gTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpICogKDEwIC0gMikpO1xuICAgICAgICBicmVhaztcblxuICAgICAgY2FzZSAzOlxuICAgICAgICBibG9ja1R5cGUgPSAncyc7XG4gICAgICAgIHggPSBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiAoMTAgLSAyKSk7XG4gICAgICAgIGJyZWFrO1xuXG4gICAgICBjYXNlIDQ6XG4gICAgICAgIGJsb2NrVHlwZSA9ICd6JztcbiAgICAgICAgeCA9IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSAqICgxMCAtIDIpKTtcbiAgICAgICAgYnJlYWs7XG5cbiAgICAgIGNhc2UgNTpcbiAgICAgICAgYmxvY2tUeXBlID0gJ2onO1xuICAgICAgICB4ID0gTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpICogKDEwIC0gMikpO1xuICAgICAgICBicmVhaztcblxuICAgICAgY2FzZSA2OlxuICAgICAgICBibG9ja1R5cGUgPSAnbCc7XG4gICAgICAgIHggPSBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiAoMTAgLSAyKSk7XG4gICAgICAgIGJyZWFrO1xuXG4gICAgfVxuXG4gICAgY29uc3QgeSA9IDA7XG4gICAgZmFsbGluZ0Jsb2NrID0gbmV3IGJsb2NrKGJsb2NrVHlwZSwgeCwgeSk7XG4gIH1cblxuXG5cbiAgLy8gcHJvY2VzcyBhbGwga2V5c3Ryb2tlc1xuICBmdW5jdGlvbiBwcm9jZXNzS2V5c3Ryb2tlKGtleSkge1xuXG4gICAgaWYgKCFmYWxsaW5nQmxvY2spIHtcbiAgICAgIHJldHVybjtcbiAgICB9XG5cbiAgICAvLyBtb3ZlIGJsb2NrIGtleWJvYXJkIGlucHV0XG4gICAgc3dpdGNoIChrZXkpIHtcblxuICAgICAgY2FzZSAzODogIC8vIHVwIGFycm93XG4gICAgICAgIHJvdGF0ZSgpO1xuICAgICAgICBicmVhaztcbiAgICAgIGNhc2UgNDA6ICAvLyBkb3duIGFycm93XG4gICAgICAgIG1vdmVEb3duKCk7XG4gICAgICAgIGJyZWFrO1xuICAgICAgY2FzZSAzOTogIC8vIHJpZ2h0IGFycm93XG4gICAgICAgIG1vdmVTaWRlKCdyaWdodCcpO1xuICAgICAgICBicmVhaztcbiAgICAgIGNhc2UgMzc6ICAvLyBsZWZ0IGFycm93XG4gICAgICAgIG1vdmVTaWRlKCdsZWZ0Jyk7XG4gICAgICAgIGJyZWFrO1xuICAgIH1cblxuICB9XG5cbiAgLy8gZnVuY3Rpb24gZHJhd09uRXZlbnQoZSkge1xuICAvLyAgIGRyYXcoKTtcbiAgLy8gICBlLnByZXZlbnREZWZhdWx0KCk7XG4gIC8vIH1cblxuICAvLyBtYWluIGRyYXcgbG9vcCAoY2FsbHMgaXRzZWxmIHJlY3Vyc2l2ZWx5IGF0IGVuZClcbiAgZnVuY3Rpb24gZHJhdygpIHtcbiAgICBjaGVja1NwZWVkVXAoKTtcbiAgICBpZiAobW92ZURvd25Pck5ld0Jsb2NrKCkgPT09ICdib2FyZEZ1bGwnKSB7XG4gICAgICAvL2NvbnNvbGUubG9nKCdib2FyZEZ1bGw6ICcgKyBib2FyZEZ1bGwpO1xuICAgICAgc3BlZWQgPSAxMjU7XG4gICAgICBmb3IgKGxldCBpPTA7IGk8MTA7IGkrKykge1xuICAgICAgICBmb3IgKGxldCBqPTA7IGo8MjA7IGorKykge1xuICAgICAgICAgIGxhbmRlZFtqXVtpXSA9IDA7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICB9XG4gICAgY2hlY2tGdWxsUm93cygpO1xuICAgIGNsZWFyQm9hcmQoKTtcbiAgICAvL21ha2VHcmlkKCk7XG4gICAgLy9kcmF3VGV4dCgpO1xuICAgIGRyYXdMYW5kZWQoKTtcbiAgICBkcmF3RmFsbGluZ0Jsb2NrKCk7XG4gICAgZnJhbWUrKztcbiAgICByZXF1ZXN0QW5pbWF0aW9uRnJhbWUoZHJhdyk7XG4gIH1cblxuXG5cbiAgLy8gZXZlbnQgbGlzdGVuZXJzXG4gIC8vIGZvciB0ZXN0aW5nIC0gXCJuZXh0XCIgYnV0dG9uIGJlbG93IGJvYXJkXG4gIC8vIChtYWtlIHN1cmUgbW92ZURvd24oKSBpbiBkcmF3KCkgaXMgdW5jb21tZW50ZWQpXG4gIC8vZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJuZXh0XCIpLmFkZEV2ZW50TGlzdGVuZXIoXCJjbGlja1wiLCBkcmF3T25FdmVudCk7XG5cbiAgLy8gZXZlbnQgbGlzdGVuZXIgZm9yIGFsbCBrZXlzdHJva2VzXG4gIGRvY3VtZW50Lm9ua2V5ZG93biA9IGZ1bmN0aW9uKGUpIHtcbiAgICBwcm9jZXNzS2V5c3Ryb2tlKGUua2V5Q29kZSk7XG4gIH07XG5cblxuXG5cbiAgLy8gc3RhcnQgZ2FtZVxuICBzcGF3bkJsb2NrKCk7XG4gIGRyYXcoKTsgIC8vIGNhbGwgbWFpbiBkcmF3IGxvb3BcblxuXG5cbn0pKCk7XG4iXSwibWFwcGluZ3MiOiJBQUFBLElBQUlBLEtBQUssR0FBR0MsT0FBTyxDQUFDLFlBQUQsQ0FBbkI7O0FBRUEsQ0FBQyxZQUFVO0VBRVQ7RUFDQSxNQUFNQyxNQUFNLEdBQUdDLFFBQVEsQ0FBQ0MsY0FBVCxDQUF3QixRQUF4QixDQUFmO0VBQUEsTUFDSUMsR0FBRyxHQUFHSCxNQUFNLENBQUNJLFVBQVAsQ0FBa0IsSUFBbEIsQ0FEVjtFQUFBLE1BRUlDLFFBQVEsR0FBR0wsTUFBTSxDQUFDTSxLQUZ0Qjs7RUFJSTtBQUNOO0FBQ0E7QUFDQTtFQUlNO0VBQ0E7RUFDQUMsS0FBSyxHQUFHRixRQUFRLEdBQUcsRUFidkI7RUFjQSxJQUFJRyxLQUFLLEdBQUcsQ0FBWjtFQUFBLElBQ0lDLEtBQUssR0FBRyxHQURaO0VBQUEsSUFFSTtFQUNBQyxTQUFTLEdBQUcsY0FIaEI7RUFBQSxJQUlJO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0FDLFlBWEo7O0VBYUk7QUFDTjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7RUFLTUMsTUFBTSxHQUFHLENBQ1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQURPLEVBRVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQUZPLEVBR1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQUhPLEVBSVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQUpPLEVBS1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQUxPLEVBTVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQU5PLEVBT1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVBPLEVBUVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVJPLEVBU1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVRPLEVBVVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVZPLEVBV1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVhPLEVBWVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQVpPLEVBYVAsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixFQUFtQixDQUFuQixDQWJPLEVBY1AsQ0FBQyxDQUFELEVBQUcsQ0FBSCxFQUFLLENBQUwsRUFBTyxDQUFQLEVBQVMsQ0FBVCxFQUFXLENBQVgsRUFBYSxDQUFiLEVBQWUsQ0FBZixFQUFpQixDQUFqQixF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
+},{"./block.js":2}]},{},[1,3])

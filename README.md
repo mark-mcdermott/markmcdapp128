@@ -12,6 +12,7 @@
 - `yarn global add sass`
 - `gem install rails --no-document`
 - `gem install bundler`
+- `npm install --global gulp-cli`
 - Postgres
   - install postgres [https://www.postgresql.org/download/macosx/](https://www.postgresql.org/download/macosx/)
   - once installed, run postgres
@@ -33,3 +34,8 @@
 - (so once everything is set up, the workflow is with every change 1) push to github 2) to push to heroku. Heroku automatically restarts the app on every heroku push)
 - go to `https://markmcdapp128.herokuapp.com` in your browser
 - (note that after any db changes, you'll have to run the migrations, `heroku run rails db:migrate`. also, if you ever need to run the seeds on Heroku, use the prod seeds, `heroku run rake seed:prod`)
+
+# To Make Javascript Changes 
+- The changable javascript files are the `Block.js` or `emoji-tetrominos.js` files in `app/assets/javascript/src`
+- Make your changes there and then type `gulp`
+- Gulp should change the es6-type javascript to regular javascript and combine the files into on file in `app/assets/javascript/dist` called `emoji-tetrominos.js`. This is the file called in the game view file (`app/assets/views/game/index.html.erb`)
