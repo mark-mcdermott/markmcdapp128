@@ -11,14 +11,14 @@ orbs:
 jobs:
   build:
     docker:
-      - image: 'cimg/ruby:3.0-node'
+      - image: 'cimg/ruby:3.0.0-node'
     steps:
       - checkout
       - ruby/install-deps
       - node/install-packages
   checking:
     docker:
-      - image: 'cimg/ruby:3.0-node'
+      - image: 'cimg/ruby:3.0.0-node'
     steps:
       - checkout
       - ruby/install-deps
@@ -27,7 +27,7 @@ jobs:
           label: Inspecting with Rubocop
   test:
     docker:
-      - image: 'cimg/ruby:3.0-node'
+      - image: 'cimg/ruby:3.0.0-node'
     steps:
       - checkout
       - ruby/install-deps
