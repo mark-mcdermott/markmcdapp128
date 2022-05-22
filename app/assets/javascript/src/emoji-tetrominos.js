@@ -1,4 +1,4 @@
-let block = require("./block.js");
+let block = require("./Block.js");
 
 (function(){
 
