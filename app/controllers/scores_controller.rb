@@ -1,5 +1,7 @@
 class ScoresController < ApplicationController
+
   before_action :set_score, only: %i[ show edit update destroy ]
+  skip_before_action :authorized, only: [:index]
 
   # GET /scores or /scores.json
   def index
