@@ -1,6 +1,7 @@
 @import 'bootstrap/scss/bootstrap';
 @import 'bootstrap-icons/font/bootstrap-icons';
 
-body {
-	background: $gray-200;
+canvas {
+	border: 1px solid #000;
+	margin: 50px 0 0;
 }
