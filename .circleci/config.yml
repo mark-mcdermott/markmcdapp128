@@ -20,8 +20,12 @@ jobs:
       - run:
           name: Install NPM Globals
           command: sudo yarn global add sass gulp-cli
-      - run: gulp
-      - run: bundle install
+      - run:
+          name: Transpiling JavaScript
+          command: gulp scripts
+      - run:
+          name: Running Bundle Install
+          command: bundle install
 
 workflows:
   main_workflow:
