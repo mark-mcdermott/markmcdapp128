@@ -25,7 +25,7 @@ namespace :seed do
   desc "seed scores"
   task :scores => :environment do
     Score.create([
-      {value: 899, date: DateTime.new(2022,6,10), user_id: 1 }
+      {value: 899, date: DateTime.new(2022,6,10), user_id: User.find(User.pluck(:id).sample).id }
     ])
     # Score.create([
     #   {value: rand(1..1000), date: DateTime.new(rand(2021..2022),rand(1..12),rand(1..28)), user_id: rand(1..6)},
