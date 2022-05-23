@@ -343,7 +343,7 @@ module.exports = class Block {
     this.width = 2;        // I block width (for wall collision)
     this.numPix = 4;       // num pixels in I block
     this.curRotation = 0;  // current pos in rotations array
-    this.emoji = "📙";
+    this.emoji = "🍆";
     this.coords = [ [ x, y ], [ x + 1, y ], [ x, y + 1 ], [ x + 1, y + 1 ] ];
     this.rotate = function() {
       // no rotation on O block;
