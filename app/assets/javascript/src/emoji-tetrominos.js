@@ -3,7 +3,8 @@ let block = require("./Block.js");
 (function(){
 
   // init vars
-  const canvas = document.getElementById("canvas"),
+  const canvas = document.getElementById("canvas");
+  const gameScore = document.getElementById("gameScore");
       ctx = canvas.getContext("2d"),
       canWidth = canvas.width,
 
@@ -65,7 +66,8 @@ let block = require("./Block.js");
         [0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0]
-      ];
+      ],
+      score = 0;
 
       // init blocks
 
@@ -127,6 +129,7 @@ let block = require("./Block.js");
 
   function checkFullRows()
   {
+    needToUpdateScoreDisplay = false;
     // check for any full rows
     for (let i=0; i<20; i++) {
       // goes down far left pixel from top of board to bottom
@@ -140,6 +143,8 @@ let block = require("./Block.js");
           }
         }
         if (fullRow) {
+          score += 1000;
+          needToUpdateScoreDisplay = true;
           // clear the found full row
           for (let j=0; j<10; j++) {
             landed[i][j] = 0;
@@ -164,6 +169,7 @@ let block = require("./Block.js");
         }
       }
     }
+    return needToUpdateScoreDisplay ? true : false;
   }
 
   // move the falling block down
@@ -280,7 +286,7 @@ let block = require("./Block.js");
   }
 
   // clear the whole board each frame to redraw all pieces in new pos
-  function clearBoard() {
+  function clearBoardBetweenFrames() {
     ctx.clearRect(0, 0, 10 * pixel, 20 * pixel);
   }
 
@@ -394,6 +400,14 @@ let block = require("./Block.js");
   //     }
   //   }
   // }
+
+  function clearBoardAfterGameOver() {
+    for (let i=0; i<10; i++) {
+      for (let j=0; j<20; j++) {
+        landed[j][i] = 0;
+      }
+    }
+  }
 
   function moveDownOrNewBlock() {
     //console.log(speed);
@@ -511,20 +525,32 @@ let block = require("./Block.js");
   //   e.preventDefault();
   // }
 
+  function resetForNewGame() {
+    score = 0;
+    speed = 125;
+    updateScoreDisplay(score);
+    clearBoardAfterGameOver();
+  }
+
+  function updateScoreDisplay(score) {
+    gameScore.innerText = score;
+  }
+
+  function setInitialScore() {
+    score = 0;
+    updateScoreDisplay(score);
+  }
+
   // main draw loop (calls itself recursively at end)
   function draw() {
     checkSpeedUp();
     if (moveDownOrNewBlock() === 'boardFull') {
-      //console.log('boardFull: ' + boardFull);
-      speed = 125;
-      for (let i=0; i<10; i++) {
-        for (let j=0; j<20; j++) {
-          landed[j][i] = 0;
-        }
-      }
+      resetForNewGame();
     }
-    checkFullRows();
-    clearBoard();
+    if (checkFullRows()) {
+      updateScoreDisplay(score);
+    }
+    clearBoardBetweenFrames();
     //makeGrid();
     //drawText();
     drawLanded();
@@ -545,13 +571,9 @@ let block = require("./Block.js");
     processKeystroke(e.keyCode);
   };
 
-
-
-
   // start game
+  setInitialScore();
   spawnBlock();
   draw();  // call main draw loop
-
-
 
 })();
